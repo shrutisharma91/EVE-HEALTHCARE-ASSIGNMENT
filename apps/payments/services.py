@@ -26,6 +26,8 @@ def create_payment(*, user, booking_id, idempotency_key, simulate_outcome=None, 
     The same user and Idempotency-Key returns the original payment. The amount
     always comes from the booking, never from the client. A failed simulation
     is a normal business result: the payment row is FAILED and so is the booking.
+    simulate_outcome PENDING leaves the payment INITIATED and the booking PENDING.
+    The webhook is what moves that attempt to SUCCESS or FAILED.
     """
     key = (idempotency_key or "").strip()
     if not key:
@@ -57,11 +59,12 @@ def create_payment(*, user, booking_id, idempotency_key, simulate_outcome=None, 
                 idempotency_key=key,
             )
             result = simulator.process(payment)
-            apply_payment_result(
-                payment,
-                result.status,
-                failure_reason=result.failure_reason,
-            )
+            if result.status != "PENDING":
+                apply_payment_result(
+                    payment,
+                    result.status,
+                    failure_reason=result.failure_reason,
+                )
     except IntegrityError:
         replay = _matching_payment(user, key, booking_id, lock=False)
         if replay is not None:

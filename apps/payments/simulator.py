@@ -13,10 +13,11 @@ class SimulatedResult:
 
 
 class PaymentSimulator:
-    """Decide SUCCESS or FAILED without calling out to a network.
+    """Decide SUCCESS, FAILED, or PENDING without calling out to a network.
 
     `process(payment)` is the whole interface. A Razorpay (or similar) gateway
-    can replace this class without changing the booking flow.
+    can replace this class without changing the booking flow. PENDING means the
+    gateway has not settled yet: the payment stays INITIATED until a webhook.
     """
 
     def __init__(
@@ -35,6 +36,8 @@ class PaymentSimulator:
         outcome = self.forced_outcome
         if outcome is None:
             outcome = "SUCCESS" if self.rng.random() < self.success_rate else "FAILED"
+        if outcome == "PENDING":
+            return SimulatedResult(status="PENDING", failure_reason=None)
         if outcome == "SUCCESS":
             return SimulatedResult(status="SUCCESS", failure_reason=None)
         return SimulatedResult(status="FAILED", failure_reason="insufficient_funds")

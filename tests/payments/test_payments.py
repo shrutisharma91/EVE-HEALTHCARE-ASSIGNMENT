@@ -209,6 +209,40 @@ def test_apply_payment_result_is_order_safe(user):
     assert late.status == PaymentStatus.SUCCESS
 
 
+@pytest.mark.django_db
+def test_pending_outcome_stays_initiated_until_the_webhook(auth_client, user):
+    booking = BookingFactory(user=user, amount="450.00")
+    response = pay(auth_client, booking, "key-pending", outcome="PENDING")
+    assert response.status_code == 201
+    assert response.data["status"] == "INITIATED"
+    assert response.data["failure_reason"] is None
+    assert response.data["booking_status"] == "PENDING"
+    booking.refresh_from_db()
+    assert booking.status == "PENDING"
+    payment = Payment.objects.get(pk=response.data["id"])
+    assert payment.status == PaymentStatus.INITIATED
+
+    from tests.payments.test_webhooks import post_webhook
+
+    payload = {
+        "event_id": "evt_pending_settle",
+        "event_type": "payment.succeeded",
+        "data": {
+            "provider_reference": payment.provider_reference,
+            "amount": str(payment.amount),
+            "currency": "INR",
+        },
+        "created_at": "2026-09-26T10:00:00Z",
+    }
+    accepted = post_webhook(payload)
+    assert accepted.status_code == 200
+    assert accepted.data["status"] == "accepted"
+    booking.refresh_from_db()
+    payment.refresh_from_db()
+    assert payment.status == PaymentStatus.SUCCESS
+    assert booking.status == "CONFIRMED"
+
+
 def test_simulator_uses_the_injected_rng():
     class Sequence:
         def __init__(self, values):
@@ -223,3 +257,6 @@ def test_simulator_uses_the_injected_rng():
     assert high.process(object()).failure_reason == "insufficient_funds"
     forced = PaymentSimulator(forced_outcome="FAILED")
     assert forced.process(object()).status == "FAILED"
+    pending = PaymentSimulator(forced_outcome="PENDING")
+    assert pending.process(object()).status == "PENDING"
+    assert pending.process(object()).failure_reason is None

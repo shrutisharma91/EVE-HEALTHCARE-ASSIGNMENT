@@ -41,8 +41,12 @@ class WebhookSerializer(StrictSerializer):
 class PaymentCreateSerializer(StrictSerializer):
     booking_id = serializers.UUIDField()
     simulate_outcome = serializers.ChoiceField(
-        choices=["SUCCESS", "FAILED"],
+        choices=["SUCCESS", "FAILED", "PENDING"],
         required=False,
+        help_text=(
+            "SUCCESS and FAILED settle inline. PENDING leaves the payment "
+            "INITIATED until a signed webhook arrives."
+        ),
     )
 
     def to_internal_value(self, data):

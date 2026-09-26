@@ -85,9 +85,13 @@ sequenceDiagram
     Note over DB: amount copied from CentreTest.price
     Client->>API: POST /payments/ + Idempotency-Key
     API->>DB: lock booking, insert Payment INITIATED
-    API->>Simulator: process(payment)
-    API->>DB: apply_payment_result
-    API-->>Client: 201 payment and booking status
+    alt simulate_outcome SUCCESS or FAILED
+        API->>Simulator: process(payment)
+        API->>DB: apply_payment_result
+        API-->>Client: 201 settled payment and booking status
+    else simulate_outcome PENDING
+        API-->>Client: 201 payment INITIATED, booking still PENDING
+    end
     Client->>API: POST /payments/webhook/ (signed)
     API->>DB: insert WebhookEvent (event_id unique)
     API->>Worker: process_webhook_event
@@ -96,7 +100,7 @@ sequenceDiagram
     Worker->>DB: apply_payment_result (same function)
 ```
 
-`PaymentSimulator.process(payment)` returns a small result object. `POST /payments/` calls it inline. A real gateway such as Razorpay can replace that class later; the booking update still goes through `apply_payment_result`, which the webhook uses too.
+`PaymentSimulator.process(payment)` returns a small result object. `POST /payments/` calls it inline for `SUCCESS` and `FAILED`. `simulate_outcome: "PENDING"` does not settle anything: the payment stays `INITIATED` and the booking stays `PENDING` until a signed webhook calls `apply_payment_result`. That is the same split a gateway such as Razorpay uses. The simulator class can be swapped for a real provider later; the booking update still goes through `apply_payment_result`.
 
 ## Database design
 
@@ -289,6 +293,8 @@ curl -s -X POST http://localhost:8000/payments/ \
 
 `201` even when the simulated outcome is `FAILED`. The same key again returns `200` and the original payment. The same key with a different booking returns `422 IDEMPOTENCY_KEY_REUSED`. Omit `simulate_outcome` to use `PAYMENT_SUCCESS_RATE` (default `0.8`).
 
+`simulate_outcome: "PENDING"` returns `201` with the payment `INITIATED` and the booking still `PENDING`. Nothing is confirmed or failed until `POST /payments/webhook/` arrives with a matching `provider_reference`. Use the `provider_reference` from that response when you sign the webhook.
+
 ### Webhook
 
 ```bash
@@ -347,6 +353,7 @@ A webhook looks up an existing payment by `provider_reference`. An unknown refer
 | Pay a failed or cancelled booking | 409 `BOOKING_NOT_PAYABLE` |
 | Appointment no longer in the future | 409 `BOOKING_EXPIRED` |
 | Simulated payment failure | 201 with payment and booking `FAILED` |
+| `simulate_outcome` `PENDING` | 201, payment `INITIATED`, booking stays `PENDING` until the webhook |
 | Bad, missing, or stale webhook signature | 401 `INVALID_WEBHOOK_SIGNATURE` |
 | Malformed webhook body | 400 `VALIDATION_ERROR` or `PARSE_ERROR` |
 | Unknown `event_type` | 200, event stored as `IGNORED` |

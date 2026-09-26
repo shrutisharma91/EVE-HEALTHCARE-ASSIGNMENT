@@ -36,7 +36,15 @@ class PaymentCreateView(APIView):
                     "simulate_outcome": "SUCCESS",
                 },
                 request_only=True,
-            )
+            ),
+            OpenApiExample(
+                "Leave pending for the webhook",
+                value={
+                    "booking_id": "6b0b1c2e-1a2b-4c3d-8e9f-112233445566",
+                    "simulate_outcome": "PENDING",
+                },
+                request_only=True,
+            ),
         ],
     )
     def post(self, request):
