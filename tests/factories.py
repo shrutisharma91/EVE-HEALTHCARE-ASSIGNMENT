@@ -1,8 +1,11 @@
+from datetime import timedelta
 from decimal import Decimal
 
 import factory
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 
+from apps.bookings.models import Booking
 from apps.catalog.models import CentreTest, DiagnosticCentre, DiagnosticTest
 
 User = get_user_model()
@@ -58,3 +61,14 @@ class CentreTestFactory(factory.django.DjangoModelFactory):
     test = factory.SubFactory(DiagnosticTestFactory)
     price = Decimal("499.00")
     is_available = True
+
+
+class BookingFactory(factory.django.DjangoModelFactory):
+    class Meta:
+        model = Booking
+
+    user = factory.SubFactory(UserFactory)
+    centre = factory.SubFactory(DiagnosticCentreFactory)
+    test = factory.SubFactory(DiagnosticTestFactory)
+    appointment_at = factory.LazyFunction(lambda: timezone.now() + timedelta(days=2))
+    amount = Decimal("450.00")
