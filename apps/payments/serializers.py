@@ -25,6 +25,19 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class WebhookDataSerializer(StrictSerializer):
+    provider_reference = serializers.CharField(max_length=64)
+    amount = serializers.DecimalField(max_digits=10, decimal_places=2)
+    currency = serializers.CharField(max_length=3)
+
+
+class WebhookSerializer(StrictSerializer):
+    event_id = serializers.CharField(max_length=255)
+    event_type = serializers.CharField(max_length=64)
+    data = WebhookDataSerializer()
+    created_at = serializers.DateTimeField()
+
+
 class PaymentCreateSerializer(StrictSerializer):
     booking_id = serializers.UUIDField()
     simulate_outcome = serializers.ChoiceField(

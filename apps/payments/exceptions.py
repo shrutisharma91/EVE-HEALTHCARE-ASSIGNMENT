@@ -29,3 +29,9 @@ class BookingExpired(DomainError):
     status_code = 409
     code = "BOOKING_EXPIRED"
     message = "The appointment is no longer in the future."
+
+
+class InvalidWebhookSignature(DomainError):
+    status_code = 401
+    code = "INVALID_WEBHOOK_SIGNATURE"
+    message = "Webhook signature is invalid."

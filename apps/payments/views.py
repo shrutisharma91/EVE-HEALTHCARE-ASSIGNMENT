@@ -1,14 +1,19 @@
+import json
+
 from drf_spectacular.utils import OpenApiExample, extend_schema
-from rest_framework import status
+from rest_framework import exceptions, status
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.core.pagination import StandardPagination
 from apps.core.serializers import ErrorEnvelopeSerializer
 from apps.payments.exceptions import IdempotencyKeyRequired
+from apps.payments.ingress import accept_webhook
 from apps.payments.selectors import get_own_payment, payments_for_booking
-from apps.payments.serializers import PaymentCreateSerializer, PaymentSerializer
+from apps.payments.serializers import PaymentCreateSerializer, PaymentSerializer, WebhookSerializer
 from apps.payments.services import create_payment
+from apps.payments.signing import verify_webhook
 
 
 class PaymentCreateView(APIView):
@@ -47,6 +52,53 @@ class PaymentCreateView(APIView):
         )
         code = status.HTTP_201_CREATED if created else status.HTTP_200_OK
         return Response(PaymentSerializer(payment).data, status=code)
+
+
+class WebhookView(APIView):
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    throttle_classes = []
+
+    @extend_schema(
+        tags=["Payments"],
+        auth=[],
+        request=WebhookSerializer,
+        responses={200: dict, 400: ErrorEnvelopeSerializer, 401: ErrorEnvelopeSerializer},
+        examples=[
+            OpenApiExample(
+                "Payment succeeded",
+                value={
+                    "event_id": "evt_123",
+                    "event_type": "payment.succeeded",
+                    "data": {
+                        "provider_reference": "sim_pay_abc",
+                        "amount": "499.00",
+                        "currency": "INR",
+                    },
+                    "created_at": "2026-09-26T10:00:00Z",
+                },
+                request_only=True,
+            )
+        ],
+    )
+    def post(self, request):
+        verify_webhook(
+            request.body,
+            request.headers.get("X-Webhook-Signature", ""),
+            request.headers.get("X-Webhook-Timestamp", ""),
+        )
+        try:
+            payload = json.loads(request.body.decode() or "")
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise exceptions.ParseError("Malformed request body.") from exc
+        serializer = WebhookSerializer(data=payload)
+        serializer.is_valid(raise_exception=True)
+        result = accept_webhook(
+            event_id=serializer.validated_data["event_id"],
+            event_type=serializer.validated_data["event_type"],
+            payload=payload,
+        )
+        return Response(result)
 
 
 class PaymentDetailView(APIView):
