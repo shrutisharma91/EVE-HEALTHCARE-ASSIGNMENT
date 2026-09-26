@@ -1,0 +1,58 @@
+import uuid
+
+from django.conf import settings
+from django.db import models
+from django.db.models import Q
+
+from apps.bookings.models import Booking
+from apps.core.models import TimeStampedModel, UUIDModel
+
+
+class PaymentStatus(models.TextChoices):
+    INITIATED = "INITIATED", "Initiated"
+    SUCCESS = "SUCCESS", "Success"
+    FAILED = "FAILED", "Failed"
+
+
+class Payment(UUIDModel, TimeStampedModel):
+    """One attempt to pay a booking. A booking may have many attempts and one success."""
+
+    booking = models.ForeignKey(Booking, on_delete=models.PROTECT, related_name="payments")
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name="payments",
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    currency = models.CharField(max_length=3, default="INR")
+    status = models.CharField(
+        max_length=16,
+        choices=PaymentStatus.choices,
+        default=PaymentStatus.INITIATED,
+        db_index=True,
+    )
+    provider_reference = models.CharField(max_length=64, unique=True)
+    idempotency_key = models.CharField(max_length=255)
+    failure_reason = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(condition=Q(amount__gt=0), name="payment_amount_positive"),
+            models.UniqueConstraint(
+                fields=["user", "idempotency_key"],
+                name="unique_user_idempotency_key",
+            ),
+            models.UniqueConstraint(
+                fields=["booking"],
+                condition=Q(status=PaymentStatus.SUCCESS),
+                name="unique_success_payment_per_booking",
+            ),
+        ]
+
+    def __str__(self) -> str:
+        return self.provider_reference
+
+    @staticmethod
+    def new_provider_reference() -> str:
+        return f"sim_pay_{uuid.uuid4().hex}"
