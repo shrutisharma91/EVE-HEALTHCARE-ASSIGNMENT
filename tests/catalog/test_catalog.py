@@ -204,6 +204,38 @@ def test_catalogue_search_and_seed_are_idempotent(api_client):
 
 
 @pytest.mark.django_db
+def test_admin_can_update_a_test_and_remove_an_offering(admin_client, centre_with_tests):
+    renamed = admin_client.patch(
+        f"{TESTS}{centre_with_tests.cbc.id}/",
+        {"name": "CBC Panel"},
+        format="json",
+    )
+    assert renamed.status_code == 200
+    assert renamed.data["name"] == "CBC Panel"
+
+    empty = admin_client.patch(f"{TESTS}{centre_with_tests.cbc.id}/", {}, format="json")
+    assert empty.status_code == 400
+
+    removed = admin_client.delete(
+        f"{CENTRES}{centre_with_tests.id}/tests/{centre_with_tests.cbc.id}/"
+    )
+    assert removed.status_code == 204
+    listed = admin_client.get(f"{CENTRES}{centre_with_tests.id}/tests/")
+    assert [row["code"] for row in listed.data] == ["LFT"]
+
+
+@pytest.mark.django_db
+def test_seed_promotes_an_existing_admin_email(admin_user):
+    admin_user.is_staff = False
+    admin_user.is_superuser = False
+    admin_user.save(update_fields=["is_staff", "is_superuser"])
+    call_command("seed_data")
+    admin_user.refresh_from_db()
+    assert admin_user.is_staff is True
+    assert admin_user.is_superuser is True
+
+
+@pytest.mark.django_db
 def test_zero_price_is_rejected(admin_client, centre_with_tests):
     response = admin_client.post(
         f"{CENTRES}{centre_with_tests.id}/tests/",

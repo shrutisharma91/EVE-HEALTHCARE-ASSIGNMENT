@@ -156,3 +156,27 @@ def test_refresh_rotates_and_blacklists_the_old_token(api_client, user):
 
 def test_user_is_registered_in_admin():
     assert admin.site.is_registered(User)
+
+
+@pytest.mark.django_db
+def test_manager_creates_superusers_and_rejects_a_blank_email():
+    from apps.accounts.models import User
+
+    admin = User.objects.create_superuser(
+        email="Root@Eve.Test",
+        password="Str0ng!Passw0rd",
+        full_name="Root",
+    )
+    assert admin.is_staff is True
+    assert admin.is_superuser is True
+    assert admin.email == "root@eve.test"
+
+    with pytest.raises(ValueError):
+        User.objects.create_user(email="", password="Str0ng!Passw0rd", full_name="Ada")
+    with pytest.raises(ValueError):
+        User.objects.create_superuser(
+            email="nope@eve.test",
+            password="Str0ng!Passw0rd",
+            full_name="Nope",
+            is_staff=False,
+        )

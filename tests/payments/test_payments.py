@@ -66,6 +66,20 @@ def test_failed_payment_fails_the_booking_with_201(auth_client, user):
 
 
 @pytest.mark.django_db
+def test_blank_idempotency_key_is_rejected(auth_client, user):
+    booking = BookingFactory(user=user)
+    response = pay(auth_client, booking, "   ")
+    assert response.status_code == 400
+    assert response.data["error"]["code"] == "IDEMPOTENCY_KEY_REQUIRED"
+
+
+def test_apply_payment_result_rejects_an_unknown_status(user):
+    booking = BookingFactory(user=user)
+    payment = _payment(booking)
+    with pytest.raises(ValueError):
+        apply_payment_result(payment, PaymentStatus.INITIATED)
+
+
 def test_idempotency_key_is_required_and_replays_the_original(auth_client, user):
     booking = BookingFactory(user=user)
     other = BookingFactory(user=user)

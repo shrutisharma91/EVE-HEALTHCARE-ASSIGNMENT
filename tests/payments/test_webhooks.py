@@ -56,6 +56,45 @@ def post_webhook(payload, *, timestamp=None, signature=None, include_signature=T
 
 
 @pytest.mark.django_db
+def test_iso_timestamp_and_a_second_pass_are_safe(user):
+    from apps.payments.tasks import handle_webhook_event
+
+    booking, payment = _initiated(user)
+    payload = _payload(payment, "evt_iso")
+    naive = timezone.now().replace(tzinfo=None).isoformat(timespec="seconds")
+    response = post_webhook(payload, timestamp=naive)
+    assert response.status_code == 200
+    assert response.data["status"] == "accepted"
+    booking.refresh_from_db()
+    assert booking.status == "CONFIRMED"
+    handle_webhook_event("evt_iso")
+    booking.refresh_from_db()
+    assert booking.status == "CONFIRMED"
+
+    garbage = post_webhook(_payload(payment, "evt_bad_time"), timestamp="not-a-time")
+    assert garbage.status_code == 401
+    assert garbage.data["error"]["code"] == "INVALID_WEBHOOK_SIGNATURE"
+
+
+@pytest.mark.django_db
+def test_insert_race_is_a_duplicate(user):
+    from django.db import IntegrityError
+
+    _booking, payment = _initiated(user)
+    payload = _payload(payment, "evt_race")
+    first = post_webhook(payload)
+    assert first.status_code == 200
+    with patch(
+        "apps.payments.ingress.WebhookEvent.objects.get_or_create",
+        side_effect=IntegrityError("duplicate"),
+    ):
+        raced = post_webhook(payload)
+    assert raced.status_code == 200
+    assert raced.data["status"] == "duplicate"
+    assert WebhookEvent.objects.filter(event_id="evt_race").count() == 1
+
+
+@pytest.mark.django_db
 def test_valid_webhook_confirms_the_booking(user):
     booking, payment = _initiated(user)
     response = post_webhook(_payload(payment, "evt_ok"))

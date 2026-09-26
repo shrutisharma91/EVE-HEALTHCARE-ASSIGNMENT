@@ -181,6 +181,12 @@ def test_list_and_detail_hide_other_users_bookings(
 
 
 @pytest.mark.django_db
+def test_unknown_status_filter_is_rejected(auth_client):
+    response = auth_client.get(BOOKINGS, {"status": "NOPE"})
+    assert response.status_code == 400
+    assert response.data["error"]["code"] == "VALIDATION_ERROR"
+
+
 def test_malformed_booking_uuid_is_404(auth_client):
     response = auth_client.get(f"{BOOKINGS}not-a-uuid/")
     assert response.status_code == 404

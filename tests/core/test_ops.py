@@ -33,6 +33,16 @@ def test_health_is_unavailable_when_a_dependency_fails(api_client):
     assert cache_down.status_code == 503
     assert cache_down.data["cache"] == "error"
 
+    with patch("apps.core.views.connection.ensure_connection", side_effect=OSError("down")):
+        db_exception = api_client.get("/health/")
+    assert db_exception.status_code == 503
+    assert db_exception.data["db"] == "error"
+
+    with patch("apps.core.views.cache.get", return_value=None):
+        stale = api_client.get("/health/")
+    assert stale.status_code == 503
+    assert stale.data["cache"] == "error"
+
 
 @pytest.mark.django_db
 def test_request_id_is_reused_or_generated(api_client):
