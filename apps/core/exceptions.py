@@ -1,14 +1,14 @@
 """Domain errors and the one error shape every API response uses."""
 
-import logging
-
 from django.core.exceptions import PermissionDenied as DjangoPermissionDenied
 from django.http import Http404
 from rest_framework import exceptions, status
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
 
-logger = logging.getLogger(__name__)
+from apps.core.logging import get_logger
+
+logger = get_logger()
 
 
 class DomainError(Exception):
@@ -139,7 +139,7 @@ def exception_handler(exc, context):
 
     request = context.get("request")
     request_id = getattr(request, "request_id", None)
-    logger.exception("unhandled_exception", extra={"request_id": request_id})
+    logger.exception("unhandled_exception", request_id=request_id)
     return error_response(
         "INTERNAL_ERROR",
         "An unexpected error occurred.",

@@ -1,6 +1,5 @@
 """Create and cancel bookings. Status changes go through the state machine."""
 
-import logging
 from datetime import time, timedelta
 from zoneinfo import ZoneInfo
 
@@ -21,8 +20,9 @@ from apps.bookings.exceptions import (
 from apps.bookings.models import Booking
 from apps.bookings.state_machine import CANCELLED, CONFIRMED, transition
 from apps.catalog.models import CentreTest, DiagnosticCentre, DiagnosticTest
+from apps.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 IST = ZoneInfo("Asia/Kolkata")
 OPENS_AT = time(7, 0)
@@ -69,11 +69,9 @@ def create_booking(*, user, centre_id, test_id, appointment_at) -> Booking:
         raise DuplicateBooking() from exc
     logger.info(
         "booking_created",
-        extra={
-            "booking_id": str(booking.id),
-            "user_id": str(user.id),
-            "amount": str(booking.amount),
-        },
+        booking_id=str(booking.id),
+        user_id=str(user.id),
+        amount=str(booking.amount),
     )
     return booking
 
@@ -102,11 +100,9 @@ def cancel_booking(*, user, booking_id, reason: str = "") -> Booking:
         booking.save(update_fields=["status", "cancelled_at", "cancellation_reason", "updated_at"])
     logger.info(
         "booking_cancelled",
-        extra={
-            "booking_id": str(booking.id),
-            "user_id": str(user.id),
-            "refund_required": refund_required,
-        },
+        booking_id=str(booking.id),
+        user_id=str(user.id),
+        refund_required=refund_required,
     )
     return booking
 

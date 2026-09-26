@@ -1,13 +1,12 @@
 """Charge a booking and apply the result. The webhook uses the same apply function."""
 
-import logging
-
 from django.db import IntegrityError, transaction
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from apps.bookings.models import Booking
 from apps.bookings.state_machine import CANCELLED, CONFIRMED, FAILED, PENDING, transition
+from apps.core.logging import get_logger
 from apps.payments.exceptions import (
     BookingAlreadyPaid,
     BookingExpired,
@@ -18,7 +17,7 @@ from apps.payments.exceptions import (
 from apps.payments.models import Payment, PaymentStatus
 from apps.payments.simulator import PaymentSimulator
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def create_payment(*, user, booking_id, idempotency_key, simulate_outcome=None, simulator=None):
@@ -97,12 +96,10 @@ def apply_payment_result(payment, status, *, failure_reason=None) -> Payment:
         if payment.status == PaymentStatus.SUCCESS and status == PaymentStatus.FAILED:
             logger.info(
                 "payment_processed",
-                extra={
-                    "payment_id": str(payment.id),
-                    "booking_id": str(booking.id),
-                    "ignored": True,
-                    "reason": "success_is_final",
-                },
+                payment_id=str(payment.id),
+                booking_id=str(booking.id),
+                ignored=True,
+                reason="success_is_final",
             )
             payment.booking = booking
             return payment
@@ -113,12 +110,10 @@ def apply_payment_result(payment, status, *, failure_reason=None) -> Payment:
             payment.save(update_fields=["status", "failure_reason", "updated_at"])
             logger.info(
                 "payment_processed",
-                extra={
-                    "payment_id": str(payment.id),
-                    "booking_id": str(booking.id),
-                    "status": payment.status,
-                    "refund_required": True,
-                },
+                payment_id=str(payment.id),
+                booking_id=str(booking.id),
+                status=payment.status,
+                refund_required=True,
             )
             payment.booking = booking
             return payment
@@ -137,12 +132,10 @@ def apply_payment_result(payment, status, *, failure_reason=None) -> Payment:
 
     logger.info(
         "payment_processed",
-        extra={
-            "payment_id": str(payment.id),
-            "booking_id": str(booking.id),
-            "status": payment.status,
-            "refund_required": False,
-        },
+        payment_id=str(payment.id),
+        booking_id=str(booking.id),
+        status=payment.status,
+        refund_required=False,
     )
     payment.booking = booking
     return payment

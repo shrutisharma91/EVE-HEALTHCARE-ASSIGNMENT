@@ -11,6 +11,12 @@ class ErrorEnvelopeSerializer(serializers.Serializer):
     error = ErrorBodySerializer()
 
 
+class HealthSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    db = serializers.CharField()
+    cache = serializers.CharField()
+
+
 class StrictSerializer(serializers.Serializer):
     """Reject keys the client invented. Typos should fail loudly."""
 

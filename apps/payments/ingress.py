@@ -1,14 +1,13 @@
 """Accept a webhook quickly. The Celery task does the booking update."""
 
-import logging
-
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
+from apps.core.logging import get_logger
 from apps.payments.models import ProcessingStatus, WebhookEvent
 from apps.payments.tasks import KNOWN_EVENTS, process_webhook_event
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 
 def accept_webhook(*, event_id: str, event_type: str, payload: dict) -> dict:
@@ -31,13 +30,13 @@ def accept_webhook(*, event_id: str, event_type: str, payload: dict) -> dict:
         created = False
 
     if not created:
-        logger.info("webhook_duplicate", extra={"event_id": event_id})
+        logger.info("webhook_duplicate", event_id=event_id)
         return {"status": "duplicate", "event_id": event_id}
 
     if ignored:
-        logger.info("webhook_received", extra={"event_id": event_id, "ignored": True})
+        logger.info("webhook_received", event_id=event_id, ignored=True)
         return {"status": "ignored", "event_id": event_id}
 
-    logger.info("webhook_received", extra={"event_id": event_id, "event_type": event_type})
+    logger.info("webhook_received", event_id=event_id, event_type=event_type)
     process_webhook_event.delay(event.event_id)
     return {"status": "accepted"}

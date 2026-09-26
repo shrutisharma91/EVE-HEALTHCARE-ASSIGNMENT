@@ -1,17 +1,17 @@
 """Background processing for payment webhooks. Domain errors are not retried."""
 
-import logging
 from decimal import Decimal
 
 from django.db import OperationalError, transaction
 from django.utils import timezone
 
 from apps.bookings.models import Booking
+from apps.core.logging import get_logger
 from apps.payments.models import Payment, PaymentStatus, ProcessingStatus, WebhookEvent
 from apps.payments.services import apply_payment_result
 from celery import shared_task
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 SUCCEEDED = "payment.succeeded"
 FAILED_EVENT = "payment.failed"
@@ -55,11 +55,9 @@ def handle_webhook_event(event_id: str) -> None:
         if not _amount_matches(payment, data):
             logger.warning(
                 "webhook_amount_mismatch",
-                extra={
-                    "event_id": event.event_id,
-                    "payment_id": str(payment.id),
-                    "booking_id": str(booking.id),
-                },
+                event_id=event.event_id,
+                payment_id=str(payment.id),
+                booking_id=str(booking.id),
             )
             event.payment = payment
             _fail(event, "Amount or currency does not match the payment.")
@@ -83,7 +81,8 @@ def handle_webhook_event(event_id: str) -> None:
         )
     logger.info(
         "webhook_processed",
-        extra={"event_id": event_id, "payment_id": str(payment.id)},
+        event_id=event_id,
+        payment_id=str(payment.id),
     )
 
 

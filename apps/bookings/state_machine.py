@@ -1,10 +1,9 @@
 """The only place a booking's status is allowed to change."""
 
-import logging
-
 from apps.bookings.exceptions import InvalidStateTransition
+from apps.core.logging import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger()
 
 PENDING = "PENDING"
 CONFIRMED = "CONFIRMED"
@@ -28,11 +27,9 @@ def transition(booking, new_status: str):
     if new_status not in allowed:
         logger.info(
             "invalid_state_transition",
-            extra={
-                "booking_id": str(getattr(booking, "id", "")),
-                "from_status": booking.status,
-                "to_status": new_status,
-            },
+            booking_id=str(getattr(booking, "id", "")),
+            from_status=booking.status,
+            to_status=new_status,
         )
         raise InvalidStateTransition()
     booking.status = new_status
