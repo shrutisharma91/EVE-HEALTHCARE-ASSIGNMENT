@@ -6,6 +6,8 @@ extend-exclude = ["**/migrations"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
+# The formatter owns line length. E501 fights readable schema dicts and seed rows.
+ignore = ["E501"]
 
 [tool.ruff.lint.per-file-ignores]
 "config/settings/*.py" = ["E402", "F403", "F405"]
