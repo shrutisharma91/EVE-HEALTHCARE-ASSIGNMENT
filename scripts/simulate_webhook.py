@@ -33,7 +33,7 @@ def main() -> None:
     parser.add_argument("--url", default="http://localhost:8000/payments/webhook/")
     parser.add_argument("--event-id", default="evt_demo")
     parser.add_argument("--event-type", default="payment.succeeded")
-    parser.add_argument("--provider-reference", required=True)
+    parser.add_argument("--provider-reference", default="sim_pay_demo")
     parser.add_argument("--amount", default="499.00")
     parser.add_argument("--currency", default="INR")
     parser.add_argument("--times", type=int, default=3)
