@@ -50,6 +50,9 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       SEED_DATA: "false"
     command: celery -A config worker --loglevel=info
+    # The image healthcheck calls gunicorn. This container only runs Celery.
+    healthcheck:
+      disable: true
     depends_on:
       db:
         condition: service_healthy
