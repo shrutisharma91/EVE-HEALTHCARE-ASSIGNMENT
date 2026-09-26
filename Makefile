@@ -1,4 +1,10 @@
-.PHONY: up down logs migrate seed test coverage lint format shell webhook
+.PHONY: up down logs migrate seed test coverage lint format shell webhook smoke
+
+ifeq ($(OS),Windows_NT)
+  PY := $(if $(wildcard .venv/Scripts/python.exe),.venv/Scripts/python.exe,python)
+else
+  PY := $(if $(wildcard .venv/bin/python),.venv/bin/python,python)
+endif
 
 up:
 	docker compose up --build
@@ -34,3 +40,6 @@ shell:
 
 webhook:
 	python scripts/simulate_webhook.py --times 3
+
+smoke:
+	$(PY) scripts/api_smoke_test.py --flush-throttle

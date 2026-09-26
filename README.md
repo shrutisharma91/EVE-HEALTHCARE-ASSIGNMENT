@@ -376,6 +376,24 @@ pytest --cov --cov-fail-under=90
 
 `make test` runs pytest. `make coverage` enforces the 90% gate. Tests use PostgreSQL and Redis, factories for every model, and `freezegun` for token expiry and the cancellation window. Covered areas: auth, catalogue filters and cache invalidation, booking rules, every allowed and disallowed state transition, payment idempotency, the partial unique success index, signed webhooks including three duplicate deliveries, a threaded duplicate-event race, health, the error envelope, and login throttling. The latest local run covered about 96% of `apps` and `config`. CI fails the job under 90%, and also runs `ruff check`, `ruff format --check`, and `makemigrations --check`.
 
+## Verifying the running API
+
+Pytest does not talk to the Compose network. The smoke runner sends real HTTP at the stack in [docs/API_TEST_PLAN.md](docs/API_TEST_PLAN.md): health, auth, catalogue, bookings, payments, signed webhooks, and throttling.
+
+```bash
+docker compose down -v
+docker compose up --build -d
+docker compose exec web python manage.py seed_data
+pip install -r requirements-dev.txt
+make smoke
+```
+
+`make smoke` flushes Redis throttle keys, then runs `scripts/api_smoke_test.py`. Each case prints `PASS`, `FAIL`, or `SKIP`. The process exits non-zero if anything fails. The latest run is [docs/API_TEST_REPORT.md](docs/API_TEST_REPORT.md).
+
+`SKIP` is only used when the live stack cannot set the clock up: an expired access token, cancelling a confirmed booking inside two hours, and paying a booking whose appointment has passed. Each skip names the pytest that covers it.
+
+The same matrix is in Postman. Import `postman/EVE_Healthcare.postman_collection.json` and `postman/local.postman_environment.json`. Select the local environment so `base_url` and `webhook_secret` match `.env`. Webhook requests sign the raw body in a pre-request script. Run the collection from top to bottom so tokens and ids chain. `SEED_DATA=true` already loads the admin (`admin@eve.test` / `Clinic#Host2026`) on boot; the explicit `seed_data` command above is safe to repeat.
+
 ## Assumptions
 
 - One test per booking. A cart of several tests would be a new model.
@@ -419,7 +437,10 @@ eve-healthcare-backend/
 │   ├── payments/            # attempts, simulator, signed webhook, Celery task
 │   └── core/                # errors, pagination, logging, health
 ├── tests/                   # mirrors the apps, plus factories and conftest
+├── docs/                    # API test plan and the latest smoke report
+├── postman/                 # collection and local environment
 ├── scripts/simulate_webhook.py
+├── scripts/api_smoke_test.py
 ├── .github/workflows/ci.yml
 ├── Dockerfile
 ├── docker-compose.yml
