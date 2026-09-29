@@ -241,8 +241,12 @@ If all of the above pass, the core assignment (auth, centres/tests, bookings, si
 3. From the project root:
 
 ```bash
-python scripts/simulate_webhook.py --provider-reference <provider_reference>
+python scripts/simulate_webhook.py \
+  --provider-reference <provider_reference> \
+  --amount <payment_amount_from_response>
 ```
+
+Use the exact `amount` and `provider_reference` from the PENDING payment response (for example Guwahati CBC is often `405.00`, never the old default `499.00`). The script generates a fresh `event_id` each run.
 
 4. `GET /bookings/{id}/` → expect `CONFIRMED`.  
 5. Run the webhook script again with the same event → expect `duplicate` (idempotent webhook).

@@ -6,6 +6,7 @@ from django.db import OperationalError, transaction
 from django.utils import timezone
 
 from apps.bookings.models import Booking
+from apps.core.exceptions import DomainError
 from apps.core.logging import get_logger
 from apps.payments.models import Payment, PaymentStatus, ProcessingStatus, WebhookEvent
 from apps.payments.services import apply_payment_result
@@ -34,13 +35,27 @@ def process_webhook_event(self, event_id: str):
         if final:
             return None
         raise
+    except DomainError as exc:
+        # Never leave the event stuck in RECEIVED after a domain failure.
+        record_webhook_attempt(event_id, exc, final=True)
+        logger.warning(
+            "webhook_domain_error",
+            event_id=event_id,
+            error=str(exc),
+            code=getattr(exc, "code", ""),
+        )
+        return None
     return None
 
 
 def handle_webhook_event(event_id: str) -> None:
     with transaction.atomic():
         event = WebhookEvent.objects.select_for_update().get(event_id=event_id)
-        if event.processing_status in (ProcessingStatus.PROCESSED, ProcessingStatus.IGNORED):
+        if event.processing_status in (
+            ProcessingStatus.PROCESSED,
+            ProcessingStatus.IGNORED,
+            ProcessingStatus.FAILED,
+        ):
             return
 
         data = event.payload.get("data") or {}

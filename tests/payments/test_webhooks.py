@@ -9,7 +9,7 @@ from rest_framework.test import APIClient
 
 from apps.bookings.state_machine import CANCELLED, transition
 from apps.payments.models import Payment, PaymentStatus, ProcessingStatus, WebhookEvent
-from apps.payments.signing import sign_body
+from apps.payments.signing import sign_webhook
 from apps.payments.tasks import process_webhook_event
 from tests.factories import BookingFactory
 
@@ -47,11 +47,14 @@ def _payload(payment, event_id, event_type="payment.succeeded", amount=None, cur
 
 def post_webhook(payload, *, timestamp=None, signature=None, include_signature=True):
     body = json.dumps(payload).encode()
+    stamp = timestamp or str(int(timezone.now().timestamp()))
     headers = {
-        "HTTP_X_WEBHOOK_TIMESTAMP": timestamp or str(int(timezone.now().timestamp())),
+        "HTTP_X_WEBHOOK_TIMESTAMP": stamp,
     }
     if include_signature:
-        headers["HTTP_X_WEBHOOK_SIGNATURE"] = sign_body(body) if signature is None else signature
+        headers["HTTP_X_WEBHOOK_SIGNATURE"] = (
+            sign_webhook(stamp, body) if signature is None else signature
+        )
     return APIClient().post(WEBHOOK, data=body, content_type="application/json", **headers)
 
 
@@ -253,8 +256,8 @@ def test_concurrent_duplicate_webhook_is_processed_once(user):
     booking, payment = _initiated(user)
     payload = _payload(payment, "evt_concurrent")
     body = json.dumps(payload).encode()
-    signature = sign_body(body)
     timestamp = str(int(timezone.now().timestamp()))
+    signature = sign_webhook(timestamp, body)
     barrier = threading.Barrier(6)
     statuses = []
     errors = []
@@ -287,5 +290,97 @@ def test_concurrent_duplicate_webhook_is_processed_once(user):
     assert WebhookEvent.objects.filter(event_id="evt_concurrent").count() == 1
     event = WebhookEvent.objects.get(event_id="evt_concurrent")
     assert event.processing_status == ProcessingStatus.PROCESSED
+    booking.refresh_from_db()
+    assert booking.status == "CONFIRMED"
+
+
+@pytest.mark.django_db
+def test_late_success_after_second_attempt_confirms_only_once(auth_client, user):
+    """Variant a: first PENDING, second SUCCESS, late success webhook for attempt 1."""
+    from tests.payments.test_payments import pay
+
+    booking = BookingFactory(user=user, amount="450.00")
+    first = pay(auth_client, booking, "late-a-1", outcome="PENDING")
+    second = pay(auth_client, booking, "late-a-2", outcome="SUCCESS")
+    assert first.status_code == 201
+    assert second.status_code == 201
+    booking.refresh_from_db()
+    assert booking.status == "CONFIRMED"
+
+    first_payment = Payment.objects.get(pk=first.data["id"])
+    response = post_webhook(_payload(first_payment, "evt_late_a"))
+    assert response.status_code == 200
+    booking.refresh_from_db()
+    first_payment.refresh_from_db()
+    event = WebhookEvent.objects.get(event_id="evt_late_a")
+    assert booking.status == "CONFIRMED"
+    assert first_payment.status == PaymentStatus.FAILED
+    assert first_payment.failure_reason == "duplicate_gateway_success_refund_required"
+    assert event.processing_status == ProcessingStatus.PROCESSED
+    assert Payment.objects.filter(booking=booking, status=PaymentStatus.SUCCESS).count() == 1
+
+
+@pytest.mark.django_db
+def test_late_success_after_failed_booking_does_not_resurrect(auth_client, user):
+    """Variant b: first PENDING, second FAILED, late success webhook for attempt 1."""
+    from tests.payments.test_payments import pay
+
+    booking = BookingFactory(user=user, amount="450.00")
+    first = pay(auth_client, booking, "late-b-1", outcome="PENDING")
+    second = pay(auth_client, booking, "late-b-2", outcome="FAILED")
+    assert second.status_code == 201
+    booking.refresh_from_db()
+    assert booking.status == "FAILED"
+
+    first_payment = Payment.objects.get(pk=first.data["id"])
+    response = post_webhook(_payload(first_payment, "evt_late_b"))
+    assert response.status_code == 200
+    booking.refresh_from_db()
+    first_payment.refresh_from_db()
+    event = WebhookEvent.objects.get(event_id="evt_late_b")
+    assert booking.status == "FAILED"
+    assert first_payment.status == PaymentStatus.SUCCESS
+    assert event.processing_status == ProcessingStatus.PROCESSED
+
+
+@pytest.mark.django_db
+def test_failure_webhook_after_cancel_settles_payment_only(auth_client, user):
+    """Variant c: PENDING payment, user cancels, then payment.failed webhook."""
+    from tests.payments.test_payments import pay
+
+    booking = BookingFactory(user=user, amount="450.00")
+    first = pay(auth_client, booking, "late-c-1", outcome="PENDING")
+    transition(booking, CANCELLED)
+    booking.cancelled_at = timezone.now()
+    booking.save(update_fields=["status", "cancelled_at", "updated_at"])
+
+    first_payment = Payment.objects.get(pk=first.data["id"])
+    response = post_webhook(_payload(first_payment, "evt_late_c", event_type="payment.failed"))
+    assert response.status_code == 200
+    booking.refresh_from_db()
+    first_payment.refresh_from_db()
+    event = WebhookEvent.objects.get(event_id="evt_late_c")
+    assert booking.status == CANCELLED
+    assert first_payment.status == PaymentStatus.FAILED
+    assert event.processing_status == ProcessingStatus.PROCESSED
+
+
+@pytest.mark.django_db
+def test_future_timestamp_outside_window_is_rejected(user):
+    _booking, payment = _initiated(user)
+    future = str(int(timezone.now().timestamp()) + 600)
+    response = post_webhook(_payload(payment, "evt_future"), timestamp=future)
+    assert response.status_code == 401
+    assert response.data["error"]["code"] == "INVALID_WEBHOOK_SIGNATURE"
+
+
+@pytest.mark.django_db
+def test_webhook_ignores_unknown_extra_fields(user):
+    booking, payment = _initiated(user)
+    payload = _payload(payment, "evt_extra")
+    payload["provider_meta"] = {"region": "in"}
+    response = post_webhook(payload)
+    assert response.status_code == 200
+    assert response.data["status"] == "accepted"
     booking.refresh_from_db()
     assert booking.status == "CONFIRMED"

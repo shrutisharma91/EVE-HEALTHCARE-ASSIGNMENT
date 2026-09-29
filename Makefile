@@ -39,7 +39,8 @@ shell:
 	docker compose exec web python manage.py shell
 
 webhook:
-	python scripts/simulate_webhook.py --times 3
+	@echo "Usage: python scripts/simulate_webhook.py --provider-reference <ref> --amount <amount> [--times 3]"
+	python scripts/simulate_webhook.py --provider-reference $(REF) --amount $(AMOUNT) --times 3
 
 smoke:
 	$(PY) scripts/api_smoke_test.py --flush-throttle

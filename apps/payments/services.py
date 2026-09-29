@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 
 from apps.bookings.models import Booking
-from apps.bookings.state_machine import CANCELLED, CONFIRMED, FAILED, PENDING, transition
+from apps.bookings.state_machine import CONFIRMED, FAILED, PENDING, transition
 from apps.core.logging import get_logger
 from apps.payments.exceptions import (
     BookingAlreadyPaid,
@@ -42,13 +42,15 @@ def create_payment(*, user, booking_id, idempotency_key, simulate_outcome=None, 
 
     try:
         with transaction.atomic():
-            replay = _matching_payment(user, key, booking_id, lock=True)
-            if replay is not None:
-                return replay, False
+            # Lock the booking first so a concurrent same-key retry waits, then
+            # re-check the idempotency key before deciding the booking is payable.
             booking = get_object_or_404(
                 Booking.objects.select_for_update().filter(user=user),
                 pk=booking_id,
             )
+            replay = _matching_payment(user, key, booking_id, lock=True)
+            if replay is not None:
+                return replay, False
             _assert_payable(booking)
             payment = Payment.objects.create(
                 booking=booking,
@@ -75,12 +77,14 @@ def create_payment(*, user, booking_id, idempotency_key, simulate_outcome=None, 
 
 
 def apply_payment_result(payment, status, *, failure_reason=None) -> Payment:
-    """Move a payment to SUCCESS or FAILED and update the booking.
+    """Move a payment to SUCCESS or FAILED and update the booking when safe.
 
     Idempotent and order-safe:
     - already in the target status: do nothing
-    - SUCCESS is final, so a later failure is ignored
-    - a success for a cancelled booking does not resurrect it; a refund is logged
+    - SUCCESS is final on that payment row, so a later failure is ignored
+    - when the booking is no longer PENDING (already CONFIRMED, FAILED, or
+      CANCELLED), only the payment row is updated; a late success is logged
+      with refund_required=True so the booking is never corrupted
 
     Callers should already be inside transaction.atomic(). This opens a savepoint
     and locks the booking before the payment.
@@ -107,16 +111,37 @@ def apply_payment_result(payment, status, *, failure_reason=None) -> Payment:
             payment.booking = booking
             return payment
 
-        if booking.status == CANCELLED and status == PaymentStatus.SUCCESS:
-            payment.status = PaymentStatus.SUCCESS
-            payment.failure_reason = None
+        # Booking already left PENDING: settle this attempt only.
+        if booking.status != PENDING:
+            refund_required = status == PaymentStatus.SUCCESS
+            if status == PaymentStatus.SUCCESS:
+                other_success = (
+                    Payment.objects.select_for_update()
+                    .filter(booking=booking, status=PaymentStatus.SUCCESS)
+                    .exclude(pk=payment.pk)
+                    .exists()
+                )
+                if other_success:
+                    # Gateway charged again after the booking was already paid.
+                    # Keep the unique SUCCESS constraint; flag this row for refund.
+                    payment.status = PaymentStatus.FAILED
+                    payment.failure_reason = "duplicate_gateway_success_refund_required"
+                    refund_required = True
+                else:
+                    payment.status = PaymentStatus.SUCCESS
+                    payment.failure_reason = None
+            else:
+                payment.status = PaymentStatus.FAILED
+                payment.failure_reason = failure_reason or "insufficient_funds"
             payment.save(update_fields=["status", "failure_reason", "updated_at"])
             logger.info(
                 "payment_processed",
                 payment_id=str(payment.id),
                 booking_id=str(booking.id),
                 status=payment.status,
-                refund_required=True,
+                booking_status=booking.status,
+                refund_required=refund_required,
+                reason="booking_not_pending",
             )
             payment.booking = booking
             return payment

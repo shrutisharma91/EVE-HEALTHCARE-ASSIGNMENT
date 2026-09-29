@@ -4,8 +4,7 @@ Backend for booking a diagnostic test at a centre and paying through a simulated
 
 **For reviewers:** use **Docker** below. You do **not** need to install PostgreSQL or Redis on your machine — they run in containers. Interactive docs: [Swagger UI](http://localhost:8000/docs/).
 
-[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-2088FF)](./.github/workflows/ci.yml)
-![coverage](https://img.shields.io/badge/coverage-%E2%89%A590%25-brightgreen)
+[![CI](https://github.com/shrutisharma91/EVE-HEALTHCARE-ASSIGNMENT/actions/workflows/ci.yml/badge.svg)](https://github.com/shrutisharma91/EVE-HEALTHCARE-ASSIGNMENT/actions/workflows/ci.yml)
 
 ---
 
@@ -378,17 +377,22 @@ curl -s -X POST http://localhost:8000/payments/ \
   -H 'Idempotency-Key: pay-reviewer-001' \
   -d '{"booking_id":"<booking-uuid>","simulate_outcome":"SUCCESS"}'
 
-# Webhook helper (after PENDING payment)
-python scripts/simulate_webhook.py --provider-reference <provider_reference> --times 3
+# Webhook helper (after PENDING payment — amount must match the payment row)
+python scripts/simulate_webhook.py \
+  --provider-reference <provider_reference> \
+  --amount <amount_from_payment> \
+  --times 3
 ```
+
+Webhook HMAC is Stripe-style: `sha256=HMAC(WEBHOOK_SECRET, "{timestamp}.{raw_body}")`. Timestamps more than five minutes past **or future** are rejected.
 
 ## Idempotency & consistency
 
 1. **`Idempotency-Key`** — same user + key returns the original payment; different booking → `422`.  
-2. **`WebhookEvent.event_id`** — duplicates return `{"status":"duplicate"}`.  
+2. **`WebhookEvent.event_id`** — duplicates return `{"status":"duplicate"}`; a duplicate while still `RECEIVED` re-queues the worker.  
 3. **`select_for_update`** — booking/payment/event locked in a fixed order.  
 4. **Partial unique indexes** — no double active booking; no second SUCCESS payment.  
-5. **Order-safe apply** — late failure after success ignored; success after cancel keeps booking cancelled and logs refund.
+5. **Order-safe apply** — late failure after success ignored; success after cancel keeps booking cancelled and logs refund. Late success after the booking left PENDING settles the payment only (or flags `duplicate_gateway_success_refund_required` if a SUCCESS already exists) and never corrupts booking state.
 
 ## Edge cases handled
 

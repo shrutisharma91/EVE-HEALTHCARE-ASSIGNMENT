@@ -15,7 +15,13 @@ class PaymentStatus(models.TextChoices):
 
 
 class Payment(UUIDModel, TimeStampedModel):
-    """One attempt to pay a booking. A booking may have many attempts and one success."""
+    """One attempt to pay a booking.
+
+    A PENDING booking may have several INITIATED/FAILED attempts (for example
+    via simulate_outcome PENDING). At most one SUCCESS is allowed. Once the
+    booking itself is FAILED or CANCELLED it is terminal — the user creates a
+    new booking to try again.
+    """
 
     booking = models.ForeignKey(Booking, on_delete=models.PROTECT, related_name="payments")
     user = models.ForeignKey(

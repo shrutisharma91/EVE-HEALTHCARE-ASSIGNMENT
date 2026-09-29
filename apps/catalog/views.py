@@ -1,3 +1,5 @@
+from contextlib import suppress
+
 from django.core.cache import cache
 from drf_spectacular.utils import OpenApiExample, extend_schema
 from rest_framework import status
@@ -68,14 +70,18 @@ class CentreListCreateView(APIView):
     )
     def get(self, request):
         cache_key = centre_list_cache_key(request.query_params)
-        cached = cache.get(cache_key)
+        try:
+            cached = cache.get(cache_key)
+        except Exception:
+            cached = None
         if cached is not None:
             return Response(cached)
         queryset = filter_centres(request.query_params)
         paginator = StandardPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         payload = paginator.get_paginated_response(CentreSerializer(page, many=True).data).data
-        cache.set(cache_key, payload, CENTRE_LIST_TTL_SECONDS)
+        with suppress(Exception):
+            cache.set(cache_key, payload, CENTRE_LIST_TTL_SECONDS)
         return Response(payload)
 
     @extend_schema(

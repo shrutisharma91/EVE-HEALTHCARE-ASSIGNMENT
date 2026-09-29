@@ -25,13 +25,15 @@ class PaymentSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class WebhookDataSerializer(StrictSerializer):
+class WebhookDataSerializer(serializers.Serializer):
     provider_reference = serializers.CharField(max_length=64)
     amount = serializers.DecimalField(max_digits=10, decimal_places=2)
     currency = serializers.CharField(max_length=3)
 
 
-class WebhookSerializer(StrictSerializer):
+class WebhookSerializer(serializers.Serializer):
+    """Gateway payloads may grow new fields; ignore unknowns instead of 400."""
+
     event_id = serializers.CharField(max_length=255)
     event_type = serializers.CharField(max_length=64)
     data = WebhookDataSerializer()

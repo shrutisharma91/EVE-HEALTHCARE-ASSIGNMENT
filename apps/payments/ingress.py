@@ -11,7 +11,11 @@ logger = get_logger()
 
 
 def accept_webhook(*, event_id: str, event_type: str, payload: dict) -> dict:
-    """Store the event once and enqueue it. Repeats return duplicate with no side effects."""
+    """Store the event once and enqueue it. Repeats return duplicate with no side effects.
+
+    If a duplicate arrives while the original is still RECEIVED (for example the
+    first enqueue to Redis failed), re-queue so the event is not stuck forever.
+    """
     ignored = event_type not in KNOWN_EVENTS
     defaults = {
         "event_type": event_type,
@@ -31,6 +35,8 @@ def accept_webhook(*, event_id: str, event_type: str, payload: dict) -> dict:
 
     if not created:
         logger.info("webhook_duplicate", event_id=event_id)
+        if event.processing_status == ProcessingStatus.RECEIVED:
+            process_webhook_event.delay(event.event_id)
         return {"status": "duplicate", "event_id": event_id}
 
     if ignored:

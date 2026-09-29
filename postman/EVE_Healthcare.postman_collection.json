@@ -4129,7 +4129,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -4266,7 +4266,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -4325,7 +4325,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -4384,7 +4384,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -4495,7 +4495,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -4688,7 +4688,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -4797,7 +4797,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -5027,7 +5027,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -5218,7 +5218,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -5327,7 +5327,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -5436,7 +5436,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -5595,7 +5595,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = (Math.floor(Date.now() / 1000) - 600).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -5661,7 +5661,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"
@@ -5731,7 +5731,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const signedBody = JSON.stringify(original);",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(signedBody, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + signedBody, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.body.raw = JSON.stringify(tampered);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
@@ -5885,7 +5885,7 @@
                   "const secret = pm.environment.get(\"webhook_secret\");",
                   "const body = pm.request.body.raw;",
                   "const ts = Math.floor(Date.now() / 1000).toString();",
-                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);",
+                  "const sig = \"sha256=\" + CryptoJS.HmacSHA256(ts + \".\" + body, secret).toString(CryptoJS.enc.Hex);",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Timestamp\", value: ts });",
                   "pm.request.headers.upsert({ key: \"X-Webhook-Signature\", value: sig });",
                   "pm.request.headers.upsert({ key: \"Content-Type\", value: \"application/json\" });"

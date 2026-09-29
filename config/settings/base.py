@@ -108,7 +108,18 @@ CELERY_TASK_ACKS_LATE = True
 CELERY_TIMEZONE = "UTC"
 CELERY_TASK_TRACK_STARTED = True
 
-WEBHOOK_SECRET = env("WEBHOOK_SECRET", default="change-me-webhook-secret")
+WEBHOOK_SECRET = env("WEBHOOK_SECRET")
+_PLACEHOLDER_SECRETS = {
+    "",
+    "change-me-webhook-secret",
+    "change-me-to-a-long-random-string",
+}
+if WEBHOOK_SECRET in _PLACEHOLDER_SECRETS and not DEBUG:
+    from django.core.exceptions import ImproperlyConfigured
+
+    raise ImproperlyConfigured(
+        "Set WEBHOOK_SECRET to a non-placeholder value when DEBUG is False."
+    )
 PAYMENT_SUCCESS_RATE = env("PAYMENT_SUCCESS_RATE")
 
 REST_FRAMEWORK = {

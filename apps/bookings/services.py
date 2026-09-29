@@ -39,18 +39,22 @@ def create_booking(*, user, centre_id, test_id, appointment_at) -> Booking:
     """
     try:
         with transaction.atomic():
-            centre = DiagnosticCentre.objects.select_for_update().filter(pk=centre_id).first()
+            centre = DiagnosticCentre.objects.filter(pk=centre_id).first()
             if centre is None:
                 raise Http404()
-            test = DiagnosticTest.objects.select_for_update().filter(pk=test_id).first()
+            test = DiagnosticTest.objects.filter(pk=test_id).first()
             if test is None:
                 raise Http404()
             if not centre.is_active:
                 raise CentreInactive()
             if not test.is_active:
                 raise TestInactive()
+            # Shared lock keeps the price stable for this insert without
+            # serialising every booking of the same test across centres.
             offering = (
-                CentreTest.objects.select_for_update().filter(centre=centre, test=test).first()
+                CentreTest.objects.select_for_update(of=("self",))
+                .filter(centre=centre, test=test)
+                .first()
             )
             if offering is None:
                 raise TestNotOfferedAtCentre()
@@ -66,7 +70,14 @@ def create_booking(*, user, centre_id, test_id, appointment_at) -> Booking:
             )
             booking.save()
     except IntegrityError as exc:
-        raise DuplicateBooking() from exc
+        constraint = ""
+        cause = getattr(exc, "__cause__", None)
+        diag = getattr(cause, "diag", None)
+        if diag is not None:
+            constraint = getattr(diag, "constraint_name", "") or ""
+        if "unique_active_booking" in constraint or "unique_active_booking" in str(exc):
+            raise DuplicateBooking() from exc
+        raise
     logger.info(
         "booking_created",
         booking_id=str(booking.id),
@@ -77,17 +88,17 @@ def create_booking(*, user, centre_id, test_id, appointment_at) -> Booking:
 
 
 def cancel_booking(*, user, booking_id, reason: str = "") -> Booking:
-    """Cancel the caller's own booking.
+    """Cancel a booking the caller can see.
 
-    Pending bookings can be cancelled until they reach a terminal status.
-    A confirmed booking can be cancelled only when the appointment is more
-    than two hours away. That cancellation is where a refund would be triggered.
+    Owners cancel their own rows. Staff may cancel any booking. Pending bookings
+    can be cancelled until they reach a terminal status. A confirmed booking can
+    be cancelled only when the appointment is more than two hours away.
     """
     with transaction.atomic():
-        booking = get_object_or_404(
-            Booking.objects.select_for_update().filter(user=user).select_related("centre", "test"),
-            pk=booking_id,
-        )
+        queryset = Booking.objects.select_for_update().select_related("centre", "test")
+        if not user.is_staff:
+            queryset = queryset.filter(user=user)
+        booking = get_object_or_404(queryset, pk=booking_id)
         refund_required = False
         if booking.status == CONFIRMED:
             remaining = booking.appointment_at - timezone.now()

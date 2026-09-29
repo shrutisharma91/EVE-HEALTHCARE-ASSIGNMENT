@@ -1,4 +1,5 @@
 import hashlib
+from contextlib import suppress
 
 from django.core.cache import cache
 
@@ -7,19 +8,23 @@ _VERSION_KEY = "catalog:centres:version"
 
 
 def centre_list_version() -> int:
-    version = cache.get(_VERSION_KEY)
-    if version is None:
-        cache.set(_VERSION_KEY, 1, timeout=None)
+    try:
+        version = cache.get(_VERSION_KEY)
+        if version is None:
+            cache.set(_VERSION_KEY, 1, timeout=None)
+            return 1
+        return int(version)
+    except Exception:
         return 1
-    return int(version)
 
 
 def invalidate_centre_list_cache() -> None:
     """Bump the list version so every cached page misses. Old keys expire on their TTL."""
-    try:
-        cache.incr(_VERSION_KEY)
-    except ValueError:
-        cache.set(_VERSION_KEY, 2, timeout=None)
+    with suppress(Exception):
+        try:
+            cache.incr(_VERSION_KEY)
+        except ValueError:
+            cache.set(_VERSION_KEY, 2, timeout=None)
 
 
 def centre_list_cache_key(params) -> str:

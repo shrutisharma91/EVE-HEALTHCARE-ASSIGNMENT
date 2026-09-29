@@ -1,5 +1,6 @@
 -r requirements.txt
 httpx==0.28.1
+tzdata==2025.2
 pytest==8.4.2
 pytest-django==4.14.0
 factory-boy==3.3.3

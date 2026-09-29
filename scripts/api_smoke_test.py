@@ -17,7 +17,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -117,8 +117,9 @@ def _money(value: object) -> Decimal:
     return Decimal(str(value)).quantize(Decimal("0.01"))
 
 
-def _sign(raw: bytes, secret: str) -> str:
-    digest = hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()
+def _sign(raw: bytes, secret: str, timestamp: str) -> str:
+    message = f"{timestamp}.".encode() + raw
+    digest = hmac.new(secret.encode(), message, hashlib.sha256).hexdigest()
     return f"sha256={digest}"
 
 
@@ -395,7 +396,7 @@ class Runner:
         stamp = timestamp if timestamp is not None else str(int(time.time()))
         headers = {"Content-Type": "application/json", "X-Webhook-Timestamp": stamp}
         if include_signature:
-            headers["X-Webhook-Signature"] = signature or _sign(body, self.secret)
+            headers["X-Webhook-Signature"] = signature or _sign(body, self.secret, stamp)
         return self.request(
             "POST",
             "/payments/webhook/",
@@ -494,12 +495,18 @@ class Runner:
     def h2(self) -> None:
         resp = self.request("GET", "/docs/")
         self.expect_status(resp, 200)
-        self.expect("html" in resp.content_type.lower() or "<html" in resp.text.lower(), "HTML", resp.content_type)
+        self.expect(
+            "html" in resp.content_type.lower() or "<html" in resp.text.lower(),
+            "HTML",
+            resp.content_type,
+        )
 
     def h3(self) -> None:
         resp = self.request("GET", "/schema/")
         self.expect_status(resp, 200)
-        self.expect("/payments/webhook/" in resp.text, "schema contains /payments/webhook/", "path missing")
+        self.expect(
+            "/payments/webhook/" in resp.text, "schema contains /payments/webhook/", "path missing"
+        )
 
     def h4(self) -> None:
         resp = self.request("GET", "/health/", headers={"X-Request-ID": "smoke-123"})
@@ -550,7 +557,9 @@ class Runner:
         self.expect_status(resp, 201)
         user = resp.data["user"]  # type: ignore[index]
         self.expect("password" not in user, "no password field", list(user))
-        self.expect(bool(resp.data["access"] and resp.data["refresh"]), "access and refresh", resp.data)  # type: ignore[index]
+        self.expect(
+            bool(resp.data["access"] and resp.data["refresh"]), "access and refresh", resp.data
+        )  # type: ignore[index]
         self.expect(user["email"] == self.email_a, self.email_a, user["email"])
         self.token_a = resp.data["access"]  # type: ignore[index]
 
@@ -603,7 +612,9 @@ class Runner:
             json_body={"email": self.email_a, "password": PASSWORD},
         )
         self.expect_status(resp, 200)
-        self.expect(bool(resp.data["access"] and resp.data["refresh"]), "access and refresh", resp.data)  # type: ignore[index]
+        self.expect(
+            bool(resp.data["access"] and resp.data["refresh"]), "access and refresh", resp.data
+        )  # type: ignore[index]
         self.token_a = resp.data["access"]  # type: ignore[index]
         self.refresh_a = resp.data["refresh"]  # type: ignore[index]
 
@@ -743,7 +754,9 @@ class Runner:
         resp = self.request("GET", f"/centres/{self.cid}/")
         self.expect_status(resp, 200)
         tests = resp.data["tests"]  # type: ignore[index]
-        self.expect(bool(tests) and all("price" in row for row in tests), "nested tests with price", tests)
+        self.expect(
+            bool(tests) and all("price" in row for row in tests), "nested tests with price", tests
+        )
         cbc = next(row for row in tests if row["code"] == "CBC")
         self.tid = cbc["id"]
         self.price = _money(cbc["price"])
@@ -1032,7 +1045,9 @@ class Runner:
         try:
             got = self.request("GET", f"/bookings/{self.b1}/", token=self.token_a)
             self.expect_status(got, 200)
-            self.expect(_money(got.data["amount"]) == self.price, str(self.price), got.data["amount"])  # type: ignore[index]
+            self.expect(
+                _money(got.data["amount"]) == self.price, str(self.price), got.data["amount"]
+            )  # type: ignore[index]
         finally:
             self.request("PATCH", path, token=self.admin, json_body={"price": original})
 
@@ -1076,7 +1091,9 @@ class Runner:
         self.expect_status(resp, 201)
         self.expect(resp.data["status"] == "SUCCESS", "SUCCESS", resp.data["status"])  # type: ignore[index]
         self.expect(_money(resp.data["amount"]) == self.price, str(self.price), resp.data["amount"])  # type: ignore[index]
-        self.expect(resp.data["booking_status"] == "CONFIRMED", "CONFIRMED", resp.data["booking_status"])  # type: ignore[index]
+        self.expect(
+            resp.data["booking_status"] == "CONFIRMED", "CONFIRMED", resp.data["booking_status"]
+        )  # type: ignore[index]
         self.p1 = resp.data["id"]  # type: ignore[index]
         self.p1_key = key
 
@@ -1085,7 +1102,9 @@ class Runner:
         resp, _key = self.pay(self.b3, "FAILED")
         self.expect_status(resp, 201)
         self.expect(resp.data["status"] == "FAILED", "FAILED", resp.data["status"])  # type: ignore[index]
-        self.expect(bool(resp.data["failure_reason"]), "failure_reason set", resp.data["failure_reason"])  # type: ignore[index]
+        self.expect(
+            bool(resp.data["failure_reason"]), "failure_reason set", resp.data["failure_reason"]
+        )  # type: ignore[index]
         self.expect(resp.data["booking_status"] == "FAILED", "FAILED", resp.data["booking_status"])  # type: ignore[index]
 
     def p3_case(self) -> None:
@@ -1210,7 +1229,9 @@ class Runner:
         history = self.request("GET", f"/bookings/{booking_id}/payments/", token=self.token_a)
         self.expect_status(history, 200)
         self.expect(history.data["count"] == 1, "exactly 1 payment", history.data["count"])  # type: ignore[index]
-        self.expect(history.data["results"][0]["status"] == "SUCCESS", "SUCCESS", history.data["results"])  # type: ignore[index]
+        self.expect(
+            history.data["results"][0]["status"] == "SUCCESS", "SUCCESS", history.data["results"]
+        )  # type: ignore[index]
 
     def p19_case(self) -> None:
         raise Skip("test_expired_booking_cannot_be_paid")
@@ -1233,9 +1254,11 @@ class Runner:
         self.case("W15", "Concurrent duplicates", self.w15)
         self.case("W16", "GET webhook not allowed", self.w16)
 
-    def _event(self, reference: str, amount: str, event_type: str, event_id: str | None = None) -> dict:
+    def _event(
+        self, reference: str, amount: str, event_type: str, event_id: str | None = None
+    ) -> dict:
         return {
-            "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "created_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "data": {"amount": amount, "currency": "INR", "provider_reference": reference},
             "event_id": event_id or f"evt_{uuid.uuid4()}",
             "event_type": event_type,
@@ -1258,7 +1281,10 @@ class Runner:
                 and booking.data.get("status") == "CONFIRMED"
             ):
                 return True
-            return {"payment": getattr(payment, "data", None), "booking": getattr(booking, "data", None)}
+            return {
+                "payment": getattr(payment, "data", None),
+                "booking": getattr(booking, "data", None),
+            }
 
         self.poll("payment SUCCESS and booking CONFIRMED", ready)
         state = self.event_state(payload["event_id"])
@@ -1315,7 +1341,11 @@ class Runner:
             return {"payment": payment.data, "booking": booking.data}
 
         self.poll("payment FAILED and booking FAILED", ready)
-        self.expect(self.event_state(payload["event_id"])["status"] == "PROCESSED", "PROCESSED", "not processed")
+        self.expect(
+            self.event_state(payload["event_id"])["status"] == "PROCESSED",
+            "PROCESSED",
+            "not processed",
+        )
 
     def w5(self) -> None:
         payload = self._event(self.p17_ref, self.p17_amount, "payment.failed")
@@ -1401,28 +1431,44 @@ class Runner:
 
         self.poll("unknown reference event FAILED", ready)
         after = self.request("GET", f"/bookings/{self._control_booking}/", token=self.token_a)
-        history = self.request("GET", f"/bookings/{self._control_booking}/payments/", token=self.token_a)
-        self.expect(after.data["status"] == before.data["status"], before.data["status"], after.data["status"])  # type: ignore[index]
-        self.expect(history.data["count"] == self._control_payments, self._control_payments, history.data["count"])  # type: ignore[index]
+        history = self.request(
+            "GET", f"/bookings/{self._control_booking}/payments/", token=self.token_a
+        )
+        self.expect(
+            after.data["status"] == before.data["status"],
+            before.data["status"],
+            after.data["status"],
+        )  # type: ignore[index]
+        self.expect(
+            history.data["count"] == self._control_payments,
+            self._control_payments,
+            history.data["count"],
+        )  # type: ignore[index]
 
     def w9(self) -> None:
         payload = self._event(self.p17_ref, self.p17_amount, "payment.refunded_maybe")
         resp = self.webhook(payload)
         self.expect_status(resp, 200)
         self.expect(resp.data["status"] == "ignored", "ignored", resp.data)  # type: ignore[index]
-        self.expect(self.event_state(payload["event_id"])["status"] == "IGNORED", "IGNORED", "other")
+        self.expect(
+            self.event_state(payload["event_id"])["status"] == "IGNORED", "IGNORED", "other"
+        )
 
     def w10(self) -> None:
         payload = self._event(self.p17_ref, self.p17_amount, "payment.succeeded")
         resp = self.webhook(payload, signature="sha256=" + ("ab" * 32))
         self.expect_error(resp, 401, "INVALID_WEBHOOK_SIGNATURE")
-        self.expect(self.event_state(payload["event_id"])["count"] == 0, "no event row", "row created")
+        self.expect(
+            self.event_state(payload["event_id"])["count"] == 0, "no event row", "row created"
+        )
 
     def w11(self) -> None:
         payload = self._event(self.p17_ref, self.p17_amount, "payment.succeeded")
         resp = self.webhook(payload, include_signature=False)
         self.expect_error(resp, 401, "INVALID_WEBHOOK_SIGNATURE")
-        self.expect(self.event_state(payload["event_id"])["count"] == 0, "no event row", "row created")
+        self.expect(
+            self.event_state(payload["event_id"])["count"] == 0, "no event row", "row created"
+        )
 
     def w12(self) -> None:
         payload = self._event(self.p17_ref, self.p17_amount, "payment.succeeded")
@@ -1431,33 +1477,39 @@ class Runner:
 
     def w13(self) -> None:
         payload = {
-            "created_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "created_at": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
             "event_id": f"evt_{uuid.uuid4()}",
             "event_type": "payment.succeeded",
         }
         resp = self.webhook(payload)
         self.expect_error(resp, 400, "VALIDATION_ERROR")
-        self.expect(self.event_state(payload["event_id"])["count"] == 0, "no event row", "row created")
+        self.expect(
+            self.event_state(payload["event_id"])["count"] == 0, "no event row", "row created"
+        )
 
     def w14(self) -> None:
         original = self._event(self.p17_ref, self.p17_amount, "payment.succeeded")
         tampered = dict(original)
         tampered["data"] = dict(original["data"])
         tampered["data"]["amount"] = "1.00"
+        stamp = str(int(time.time()))
         resp = self.webhook(
             tampered,
-            signature=_sign(_canonical(original), self.secret),
+            timestamp=stamp,
+            signature=_sign(_canonical(original), self.secret, stamp),
             raw=_canonical(tampered),
         )
         self.expect_error(resp, 401, "INVALID_WEBHOOK_SIGNATURE")
-        self.expect(self.event_state(original["event_id"])["count"] == 0, "no event row", "row created")
+        self.expect(
+            self.event_state(original["event_id"])["count"] == 0, "no event row", "row created"
+        )
 
     def w15(self) -> None:
         booking_id, _payment_id, reference, amount = self.pending_payment()
         payload = self._event(reference, amount, "payment.succeeded")
         raw = _canonical(payload)
-        signature = _sign(raw, self.secret)
         timestamp = str(int(time.time()))
+        signature = _sign(raw, self.secret, timestamp)
         url = f"{self.base_url}/payments/webhook/"
 
         def one(_index: int) -> httpx.Response:
@@ -1478,9 +1530,13 @@ class Runner:
         def ready():
             state = self.event_state(payload["event_id"])
             booking = self.request("GET", f"/bookings/{booking_id}/", token=self.token_a)
-            if state.get("count") == 1 and state.get("status") == "PROCESSED":
-                if isinstance(booking.data, dict) and booking.data.get("status") == "CONFIRMED":
-                    return True
+            if (
+                state.get("count") == 1
+                and state.get("status") == "PROCESSED"
+                and isinstance(booking.data, dict)
+                and booking.data.get("status") == "CONFIRMED"
+            ):
+                return True
             return {"event": state, "booking": booking.data}
 
         self.poll("1 PROCESSED event and booking CONFIRMED", ready)
@@ -1511,7 +1567,9 @@ class Runner:
                 failures.append(f"{item.case_id} HTTP {item.status}")
             if item.status < 400:
                 continue
-            if "html" in item.content_type.lower() or item.text.lstrip().lower().startswith("<!doctype"):
+            if "html" in item.content_type.lower() or item.text.lstrip().lower().startswith(
+                "<!doctype"
+            ):
                 failures.append(f"{item.case_id} HTML {item.status}")
                 continue
             body = item.data
@@ -1521,7 +1579,9 @@ class Runner:
             err = body["error"]
             if not isinstance(err.get("code"), str) or not isinstance(err.get("message"), str):
                 failures.append(f"{item.case_id} incomplete envelope")
-        self.expect(not failures, "every error is a JSON envelope and there are zero 500s", failures)
+        self.expect(
+            not failures, "every error is a JSON envelope and there are zero 500s", failures
+        )
 
     def x2(self) -> None:
         secret = self.secret
@@ -1534,7 +1594,9 @@ class Runner:
                 problems.append(f"{item.case_id} contains a secret or stack trace")
             if _has_password_field(item.data):
                 problems.append(f"{item.case_id} contains a password field")
-        self.expect(not problems, "no password field, hash, webhook secret, or stack trace", problems)
+        self.expect(
+            not problems, "no password field, hash, webhook secret, or stack trace", problems
+        )
 
     def x3(self) -> None:
         statuses = []
@@ -1569,7 +1631,9 @@ class Runner:
                 json_request_ids += 1
             if isinstance(obj, dict) and obj.get("event") == "webhook_duplicate":
                 duplicates += 1
-        self.expect(json_request_ids > 0, "JSON lines containing request_id", f"matches={json_request_ids}")
+        self.expect(
+            json_request_ids > 0, "JSON lines containing request_id", f"matches={json_request_ids}"
+        )
         self.expect(duplicates > 0, "webhook_duplicate events from W2", f"matches={duplicates}")
 
     def _burst(self, count: int, fn) -> list:
@@ -1597,7 +1661,7 @@ class Runner:
         passed = sum(1 for row in self.results if row.status == "PASS")
         failed = sum(1 for row in self.results if row.status == "FAIL")
         skipped = sum(1 for row in self.results if row.status == "SKIP")
-        stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        stamp = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
         lines = [
             "# API test report",
             "",

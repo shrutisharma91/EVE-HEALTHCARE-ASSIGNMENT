@@ -1,8 +1,17 @@
 """Send a signed payment webhook, including duplicates, to a running server.
 
 Example:
-    python scripts/simulate_webhook.py --provider-reference sim_pay_abc --times 3
+    python scripts/simulate_webhook.py \\
+      --provider-reference sim_pay_abc \\
+      --amount 405.00 \\
+      --times 3
+
+``--amount`` must match the payment row exactly (use the amount from
+``GET /payments/{id}/``). ``--event-id`` defaults to a fresh UUID so later
+runs do not collide as duplicates.
 """
+
+from __future__ import annotations
 
 import argparse
 import hashlib
@@ -12,6 +21,7 @@ import os
 import time
 import urllib.error
 import urllib.request
+import uuid
 from pathlib import Path
 
 
@@ -31,10 +41,18 @@ def main() -> None:
     _load_dotenv()
     parser = argparse.ArgumentParser(description="Send a signed webhook N times.")
     parser.add_argument("--url", default="http://localhost:8000/payments/webhook/")
-    parser.add_argument("--event-id", default="evt_demo")
+    parser.add_argument(
+        "--event-id",
+        default=None,
+        help="Defaults to a fresh evt_<uuid> so re-runs are not treated as duplicates.",
+    )
     parser.add_argument("--event-type", default="payment.succeeded")
-    parser.add_argument("--provider-reference", default="sim_pay_demo")
-    parser.add_argument("--amount", default="499.00")
+    parser.add_argument("--provider-reference", required=True)
+    parser.add_argument(
+        "--amount",
+        required=True,
+        help="Must match the payment amount exactly (e.g. 405.00).",
+    )
     parser.add_argument("--currency", default="INR")
     parser.add_argument("--times", type=int, default=3)
     parser.add_argument("--secret", default=os.environ.get("WEBHOOK_SECRET", ""))
@@ -42,8 +60,9 @@ def main() -> None:
     if not args.secret:
         raise SystemExit("Set WEBHOOK_SECRET or pass --secret.")
 
+    event_id = args.event_id or f"evt_{uuid.uuid4()}"
     payload = {
-        "event_id": args.event_id,
+        "event_id": event_id,
         "event_type": args.event_type,
         "data": {
             "provider_reference": args.provider_reference,
@@ -53,9 +72,11 @@ def main() -> None:
         "created_at": "2026-09-26T10:00:00Z",
     }
     body = json.dumps(payload, separators=(",", ":")).encode()
-    signature = hmac.new(args.secret.encode(), body, hashlib.sha256).hexdigest()
     timestamp = str(int(time.time()))
+    message = f"{timestamp}.".encode() + body
+    signature = hmac.new(args.secret.encode(), message, hashlib.sha256).hexdigest()
 
+    print(f"event_id={event_id} amount={args.amount} ref={args.provider_reference}")
     for attempt in range(1, args.times + 1):
         request = urllib.request.Request(
             args.url,

@@ -23,7 +23,7 @@ SIGN_WEBHOOK = """
 const secret = pm.environment.get("webhook_secret");
 const body = pm.request.body.raw;
 const ts = Math.floor(Date.now() / 1000).toString();
-const sig = "sha256=" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);
+const sig = "sha256=" + CryptoJS.HmacSHA256(ts + "." + body, secret).toString(CryptoJS.enc.Hex);
 pm.request.headers.upsert({ key: "X-Webhook-Timestamp", value: ts });
 pm.request.headers.upsert({ key: "X-Webhook-Signature", value: sig });
 pm.request.headers.upsert({ key: "Content-Type", value: "application/json" });
@@ -183,7 +183,7 @@ pm.request.body.raw = JSON.stringify(payload);
 const secret = pm.environment.get("webhook_secret");
 const body = pm.request.body.raw;
 const ts = {ts};
-const sig = "sha256=" + CryptoJS.HmacSHA256(body, secret).toString(CryptoJS.enc.Hex);
+const sig = "sha256=" + CryptoJS.HmacSHA256(ts + "." + body, secret).toString(CryptoJS.enc.Hex);
 pm.request.headers.upsert({{ key: "X-Webhook-Timestamp", value: ts }});
 pm.request.headers.upsert({{ key: "X-Webhook-Signature", value: sig }});
 pm.request.headers.upsert({{ key: "Content-Type", value: "application/json" }});
@@ -346,9 +346,7 @@ pm.test("tokens + no password", function () {
             "Missing email",
             "POST",
             "/auth/signup/",
-            body=json.dumps(
-                {"password": "{{password}}", "full_name": "X", "phone": "9876543213"}
-            ),
+            body=json.dumps({"password": "{{password}}", "full_name": "X", "phone": "9876543213"}),
             tests=[
                 status_eq(400),
                 ENVELOPE,
@@ -447,9 +445,7 @@ pm.environment.set("refresh_a", j.refresh);
             "Unknown email",
             "POST",
             "/auth/login/",
-            body=json.dumps(
-                {"email": "nobody_{{run_ts}}@test.dev", "password": "{{password}}"}
-            ),
+            body=json.dumps({"email": "nobody_{{run_ts}}@test.dev", "password": "{{password}}"}),
             tests=[
                 status_eq(401),
                 ENVELOPE,
@@ -568,7 +564,7 @@ pm.environment.set("cid", match.id);
             "/centres/?test_code=CBC&page_size=100",
             tests=[
                 status_eq(200),
-                'pm.expect(pm.response.json().results.length).to.be.above(0);',
+                "pm.expect(pm.response.json().results.length).to.be.above(0);",
             ],
             description=(
                 "Asserts filtered list is non-empty. Per-centre CBC offering checks "
@@ -592,7 +588,7 @@ pm.environment.set("cid", match.id);
             "/centres/?page_size=2",
             tests=[
                 status_eq(200),
-                'const j = pm.response.json(); pm.expect(j.results.length).to.eql(2); pm.expect(j.next).to.not.be.null;',
+                "const j = pm.response.json(); pm.expect(j.results.length).to.eql(2); pm.expect(j.next).to.not.be.null;",
             ],
         ),
         req(
@@ -602,7 +598,7 @@ pm.environment.set("cid", match.id);
             "/centres/?page_size=10000",
             tests=[
                 status_eq(200),
-                'pm.expect(pm.response.json().results.length).to.be.at.most(100);',
+                "pm.expect(pm.response.json().results.length).to.be.at.most(100);",
             ],
         ),
         req(
@@ -1168,7 +1164,7 @@ pm.expect(d).to.have.property("appointment_at");
             auth="token_b",
             tests=[
                 status_eq(200),
-                'pm.expect(pm.response.json().count).to.eql(0);',
+                "pm.expect(pm.response.json().count).to.eql(0);",
             ],
         ),
         req(
@@ -1383,7 +1379,7 @@ pm.environment.set("p2", j.id);
             auth="token_a",
             tests=[
                 status_eq(200),
-                'pm.expect(pm.response.json().count).to.eql(1);',
+                "pm.expect(pm.response.json().count).to.eql(1);",
             ],
         ),
         req(
@@ -1676,8 +1672,7 @@ pm.environment.set("p17_amount", String(j.amount));
                 'pm.expect(pm.response.json().status).to.eql("SUCCESS");',
             ],
             description=(
-                "HTTP portion of P18 (one SUCCESS). Concurrent race matrix: "
-                f"{SMOKE_NOTE}"
+                f"HTTP portion of P18 (one SUCCESS). Concurrent race matrix: {SMOKE_NOTE}"
             ),
         ),
         skip_stub(
@@ -1719,10 +1714,7 @@ pm.environment.set("p17_amount", String(j.amount));
                 status_eq(200),
                 'pm.expect(pm.response.json().status).to.eql("accepted");',
             ],
-            description=(
-                "WebhookEvent PROCESSED row check via docker shell: "
-                f"{SMOKE_NOTE}"
-            ),
+            description=(f"WebhookEvent PROCESSED row check via docker shell: {SMOKE_NOTE}"),
         ),
         req(
             "W1-poll-payment",
@@ -2042,10 +2034,7 @@ pm.environment.set("p_w6_amount", String(j.amount));
                 )
             ],
             tests=[status_eq(200)],
-            description=(
-                "Worker log refund_required check for this payment: "
-                f"{SMOKE_NOTE}"
-            ),
+            description=(f"Worker log refund_required check for this payment: {SMOKE_NOTE}"),
         ),
         req(
             "W6-poll-payment",
@@ -2309,7 +2298,7 @@ tampered.data.amount = "1.00";
 const secret = pm.environment.get("webhook_secret");
 const signedBody = JSON.stringify(original);
 const ts = Math.floor(Date.now() / 1000).toString();
-const sig = "sha256=" + CryptoJS.HmacSHA256(signedBody, secret).toString(CryptoJS.enc.Hex);
+const sig = "sha256=" + CryptoJS.HmacSHA256(ts + "." + signedBody, secret).toString(CryptoJS.enc.Hex);
 pm.request.body.raw = JSON.stringify(tampered);
 pm.request.headers.upsert({ key: "X-Webhook-Timestamp", value: ts });
 pm.request.headers.upsert({ key: "X-Webhook-Signature", value: sig });
@@ -2619,9 +2608,7 @@ pm.environment.set("p_w15_amount", String(j.amount));
     env = {
         "id": "eve-local",
         "name": "EVE Healthcare local",
-        "values": [
-            {"key": k, "value": v, "enabled": True} for k, v in env_keys
-        ],
+        "values": [{"key": k, "value": v, "enabled": True} for k, v in env_keys],
         "_postman_variable_scope": "environment",
     }
 
