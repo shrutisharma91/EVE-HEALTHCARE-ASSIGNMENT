@@ -207,6 +207,7 @@ def test_apply_payment_result_is_order_safe(user):
     late.refresh_from_db()
     assert cancelled.status == CANCELLED
     assert late.status == PaymentStatus.SUCCESS
+    assert late.refund_required is True
 
 
 @pytest.mark.django_db

@@ -202,6 +202,7 @@ def test_late_failure_and_success_on_a_cancelled_booking(user):
     cancelled_payment.refresh_from_db()
     assert cancelled_booking.status == CANCELLED
     assert cancelled_payment.status == PaymentStatus.SUCCESS
+    assert cancelled_payment.refund_required is True
 
 
 @pytest.mark.django_db
@@ -314,10 +315,21 @@ def test_late_success_after_second_attempt_confirms_only_once(auth_client, user)
     first_payment.refresh_from_db()
     event = WebhookEvent.objects.get(event_id="evt_late_a")
     assert booking.status == "CONFIRMED"
-    assert first_payment.status == PaymentStatus.FAILED
-    assert first_payment.failure_reason == "duplicate_gateway_success_refund_required"
+    assert first_payment.status == PaymentStatus.SUCCESS
+    assert first_payment.refund_required is True
     assert event.processing_status == ProcessingStatus.PROCESSED
-    assert Payment.objects.filter(booking=booking, status=PaymentStatus.SUCCESS).count() == 1
+    assert (
+        Payment.objects.filter(
+            booking=booking, status=PaymentStatus.SUCCESS, refund_required=False
+        ).count()
+        == 1
+    )
+    assert (
+        Payment.objects.filter(
+            booking=booking, status=PaymentStatus.SUCCESS, refund_required=True
+        ).count()
+        == 1
+    )
 
 
 @pytest.mark.django_db
@@ -340,6 +352,7 @@ def test_late_success_after_failed_booking_does_not_resurrect(auth_client, user)
     event = WebhookEvent.objects.get(event_id="evt_late_b")
     assert booking.status == "FAILED"
     assert first_payment.status == PaymentStatus.SUCCESS
+    assert first_payment.refund_required is True
     assert event.processing_status == ProcessingStatus.PROCESSED
 
 
@@ -362,6 +375,7 @@ def test_failure_webhook_after_cancel_settles_payment_only(auth_client, user):
     event = WebhookEvent.objects.get(event_id="evt_late_c")
     assert booking.status == CANCELLED
     assert first_payment.status == PaymentStatus.FAILED
+    assert first_payment.refund_required is False
     assert event.processing_status == ProcessingStatus.PROCESSED
 
 

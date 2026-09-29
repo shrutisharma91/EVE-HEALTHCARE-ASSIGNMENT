@@ -82,9 +82,9 @@ def apply_payment_result(payment, status, *, failure_reason=None) -> Payment:
     Idempotent and order-safe:
     - already in the target status: do nothing
     - SUCCESS is final on that payment row, so a later failure is ignored
-    - when the booking is no longer PENDING (already CONFIRMED, FAILED, or
-      CANCELLED), only the payment row is updated; a late success is logged
-      with refund_required=True so the booking is never corrupted
+    - when the booking is no longer PENDING, only the payment row is updated;
+      a late success is stored as SUCCESS with refund_required=True so support
+      can query who is owed money without relying on logs
 
     Callers should already be inside transaction.atomic(). This opens a savepoint
     and locks the booking before the payment.
@@ -113,34 +113,24 @@ def apply_payment_result(payment, status, *, failure_reason=None) -> Payment:
 
         # Booking already left PENDING: settle this attempt only.
         if booking.status != PENDING:
-            refund_required = status == PaymentStatus.SUCCESS
             if status == PaymentStatus.SUCCESS:
-                other_success = (
-                    Payment.objects.select_for_update()
-                    .filter(booking=booking, status=PaymentStatus.SUCCESS)
-                    .exclude(pk=payment.pk)
-                    .exists()
-                )
-                if other_success:
-                    # Gateway charged again after the booking was already paid.
-                    # Keep the unique SUCCESS constraint; flag this row for refund.
-                    payment.status = PaymentStatus.FAILED
-                    payment.failure_reason = "duplicate_gateway_success_refund_required"
-                    refund_required = True
-                else:
-                    payment.status = PaymentStatus.SUCCESS
-                    payment.failure_reason = None
+                payment.status = PaymentStatus.SUCCESS
+                payment.failure_reason = None
+                payment.refund_required = True
             else:
                 payment.status = PaymentStatus.FAILED
                 payment.failure_reason = failure_reason or "insufficient_funds"
-            payment.save(update_fields=["status", "failure_reason", "updated_at"])
+                payment.refund_required = False
+            payment.save(
+                update_fields=["status", "failure_reason", "refund_required", "updated_at"]
+            )
             logger.info(
                 "payment_processed",
                 payment_id=str(payment.id),
                 booking_id=str(booking.id),
                 status=payment.status,
                 booking_status=booking.status,
-                refund_required=refund_required,
+                refund_required=payment.refund_required,
                 reason="booking_not_pending",
             )
             payment.booking = booking
@@ -150,13 +140,15 @@ def apply_payment_result(payment, status, *, failure_reason=None) -> Payment:
             transition(booking, CONFIRMED)
             payment.status = PaymentStatus.SUCCESS
             payment.failure_reason = None
+            payment.refund_required = False
         else:
             transition(booking, FAILED)
             payment.status = PaymentStatus.FAILED
             payment.failure_reason = failure_reason or "insufficient_funds"
+            payment.refund_required = False
 
         booking.save(update_fields=["status", "updated_at"])
-        payment.save(update_fields=["status", "failure_reason", "updated_at"])
+        payment.save(update_fields=["status", "failure_reason", "refund_required", "updated_at"])
 
     logger.info(
         "payment_processed",

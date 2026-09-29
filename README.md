@@ -18,8 +18,10 @@ Backend for booking a diagnostic test at a centre and paying through a simulated
 ### Steps
 
 ```bash
-# 1. Copy env file (once)
+# 1. Copy env file (once), then set a private webhook secret
 cp .env.example .env
+# Edit .env and replace WEBHOOK_SECRET with your own value.
+# The placeholder from .env.example is rejected when DEBUG=False.
 
 # 2. Start everything (web + Postgres + Redis + Celery worker)
 docker compose up --build -d

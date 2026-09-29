@@ -40,6 +40,14 @@ class Payment(UUIDModel, TimeStampedModel):
     provider_reference = models.CharField(max_length=64, unique=True)
     idempotency_key = models.CharField(max_length=255)
     failure_reason = models.CharField(max_length=255, null=True, blank=True)
+    refund_required = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text=(
+            "True when the gateway captured money that the booking can no longer "
+            "use (late success after cancel/fail, or a second successful charge)."
+        ),
+    )
 
     class Meta:
         ordering = ["-created_at"]
@@ -49,9 +57,11 @@ class Payment(UUIDModel, TimeStampedModel):
                 fields=["user", "idempotency_key"],
                 name="unique_user_idempotency_key",
             ),
+            # At most one SUCCESS that confirmed the booking. Extra gateway
+            # successes that need a refund are SUCCESS + refund_required=True.
             models.UniqueConstraint(
                 fields=["booking"],
-                condition=Q(status=PaymentStatus.SUCCESS),
+                condition=Q(status=PaymentStatus.SUCCESS, refund_required=False),
                 name="unique_success_payment_per_booking",
             ),
         ]

@@ -249,7 +249,7 @@ python scripts/simulate_webhook.py \
 Use the exact `amount` and `provider_reference` from the PENDING payment response (for example Guwahati CBC is often `405.00`, never the old default `499.00`). The script generates a fresh `event_id` each run.
 
 4. `GET /bookings/{id}/` → expect `CONFIRMED`.  
-5. Run the webhook script again with the same event → expect `duplicate` (idempotent webhook).
+5. The script already posts the **same** `event_id` three times (`--times` defaults to 3). Expect the first response `accepted` and the next two `duplicate`. To replay one specific event later, pass `--event-id <id printed by the script>`.
 
 ---
 

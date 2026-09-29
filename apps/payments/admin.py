@@ -12,9 +12,10 @@ class PaymentAdmin(admin.ModelAdmin):
         "amount",
         "currency",
         "status",
+        "refund_required",
         "created_at",
     )
-    list_filter = ("status", "currency")
+    list_filter = ("status", "currency", "refund_required")
     search_fields = ("provider_reference", "idempotency_key", "user__email", "booking__id")
     readonly_fields = ("created_at", "updated_at")
 

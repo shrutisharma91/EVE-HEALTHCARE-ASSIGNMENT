@@ -18,6 +18,7 @@ class PaymentSerializer(serializers.ModelSerializer):
             "status",
             "provider_reference",
             "failure_reason",
+            "refund_required",
             "idempotency_key",
             "booking_status",
             "created_at",

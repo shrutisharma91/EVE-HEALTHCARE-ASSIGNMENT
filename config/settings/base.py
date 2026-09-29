@@ -113,11 +113,15 @@ _PLACEHOLDER_SECRETS = {
     "",
     "change-me-webhook-secret",
     "change-me-to-a-long-random-string",
+    "dev-webhook-secret-replace-me",
 }
 if WEBHOOK_SECRET in _PLACEHOLDER_SECRETS and not DEBUG:
     from django.core.exceptions import ImproperlyConfigured
 
-    raise ImproperlyConfigured("Set WEBHOOK_SECRET to a non-placeholder value when DEBUG is False.")
+    raise ImproperlyConfigured(
+        "Set WEBHOOK_SECRET in .env to a private value "
+        "(not the placeholder from .env.example) when DEBUG is False."
+    )
 PAYMENT_SUCCESS_RATE = env("PAYMENT_SUCCESS_RATE")
 
 REST_FRAMEWORK = {
