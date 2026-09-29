@@ -1,6 +1,7 @@
 import json
 
-from drf_spectacular.utils import OpenApiExample, extend_schema
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema
 from rest_framework import exceptions, status
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
@@ -19,6 +20,24 @@ from apps.payments.signing import verify_webhook
 class PaymentCreateView(APIView):
     @extend_schema(
         tags=["Payments"],
+        parameters=[
+            OpenApiParameter(
+                name="Idempotency-Key",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.HEADER,
+                required=True,
+                description=(
+                    "Client-chosen unique key for this payment attempt. "
+                    "Any non-empty string works (e.g. pay-001 or a UUID). "
+                    "Replay the same key to get the original payment; "
+                    "reusing it for a different booking returns 422."
+                ),
+                examples=[
+                    OpenApiExample("Simple key", value="pay-001"),
+                    OpenApiExample("UUID key", value="a1b2c3d4-e5f6-7890-abcd-ef1234567890"),
+                ],
+            ),
+        ],
         request=PaymentCreateSerializer,
         responses={
             201: PaymentSerializer,
