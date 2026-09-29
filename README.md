@@ -1,14 +1,14 @@
-# EVE Healthcare — diagnostic bookings API
+# EVE Healthcare - diagnostic bookings API
 
 Backend for booking a diagnostic test at a centre and paying through a simulated provider.
 
-**For reviewers:** use **Docker** below. You do **not** need to install PostgreSQL or Redis on your machine — they run in containers. Interactive docs: [Swagger UI](http://localhost:8000/docs/).
+**For reviewers:** use **Docker** below. You do **not** need to install PostgreSQL or Redis on your machine - they run in containers. Interactive docs: [Swagger UI](http://localhost:8000/docs/).
 
 [![CI](https://github.com/shrutisharma91/EVE-HEALTHCARE-ASSIGNMENT/actions/workflows/ci.yml/badge.svg)](https://github.com/shrutisharma91/EVE-HEALTHCARE-ASSIGNMENT/actions/workflows/ci.yml)
 
 ---
 
-## 1. Setup (Docker — recommended)
+## 1. Setup (Docker - recommended)
 
 ### What you need
 
@@ -40,7 +40,7 @@ docker compose exec web python manage.py seed_data
 ```
 
 Open Swagger: **http://localhost:8000/docs/**  
-(Do not use `http://localhost:8000/` alone — there is no page on `/`, so you will see `404 NOT_FOUND`.)
+(Do not use `http://localhost:8000/` alone - there is no page on `/`, so you will see `404 NOT_FOUND`.)
 
 ### Login accounts (after seed)
 
@@ -74,7 +74,7 @@ Goal: login → pick a centre/test → book → pay → see booking `CONFIRMED`.
 
 **Important:** never copy UUIDs from the grey/green “Example Value” panels (those like `3fa85f64-…` are fake). Only copy ids from the **Server response** after you click **Execute**.
 
-### Step A — Authorize
+### Step A - Authorize
 
 1. `POST /auth/login/` with:
 
@@ -85,12 +85,12 @@ Goal: login → pick a centre/test → book → pay → see booking `CONFIRMED`.
 2. Copy `access` from the response.  
 3. Click **Authorize** → paste the token → Authorize → Close.
 
-### Step B — Get real centre and test ids
+### Step B - Get real centre and test ids
 
 1. `GET /centres/?city=Guwahati` → Execute → copy a centre `"id"` → call it `CENTRE_ID`.  
 2. `GET /centres/{CENTRE_ID}/` → Execute → in `tests`, pick CBC (or any row) → copy that test `"id"` → `TEST_ID`. Note `"price"`.
 
-### Step C — Create a booking
+### Step C - Create a booking
 
 `POST /bookings/` body (change the date if needed; must be **future**, within 90 days, **07:00–20:00 IST**):
 
@@ -105,7 +105,7 @@ Goal: login → pick a centre/test → book → pay → see booking `CONFIRMED`.
 **Success:** `201`, `"status": "PENDING"`, `"amount"` matches the centre price.  
 Copy response `"id"` → this is `BOOKING_ID` (the only id that works for payment).
 
-### Step D — Pay
+### Step D - Pay
 
 `POST /payments/`:
 
@@ -121,7 +121,7 @@ Copy response `"id"` → this is `BOOKING_ID` (the only id that works for paymen
 
 **Success:** `201`, payment `"status": "SUCCESS"`, `"booking_status": "CONFIRMED"`.
 
-### Step E — Confirm
+### Step E - Confirm
 
 `GET /bookings/{BOOKING_ID}/` → **Success:** `"status": "CONFIRMED"`.
 
@@ -146,8 +146,8 @@ pip install -r requirements-dev.txt
 make smoke
 ```
 
-- `make test` — pytest, coverage ≥ 90%  
-- `make smoke` — black-box cases; report at [docs/API_TEST_REPORT.md](docs/API_TEST_REPORT.md)  
+- `make test` - pytest, coverage ≥ 90%  
+- `make smoke` - black-box cases; report at [docs/API_TEST_REPORT.md](docs/API_TEST_REPORT.md)  
 - Plan: [docs/API_TEST_PLAN.md](docs/API_TEST_PLAN.md)  
 - Postman: `postman/EVE_Healthcare.postman_collection.json` + `postman/local.postman_environment.json`
 
@@ -178,7 +178,7 @@ Redis caching · Celery webhooks with retries · Docker Compose · Swagger/OpenA
 | URL | Purpose |
 |---|---|
 | http://localhost:8000/health/ | DB + Redis check |
-| http://localhost:8000/docs/ | Swagger — try the API |
+| http://localhost:8000/docs/ | Swagger - try the API |
 | http://localhost:8000/redoc/ | ReDoc |
 | http://localhost:8000/schema/ | OpenAPI JSON/YAML |
 
@@ -297,9 +297,9 @@ erDiagram
     }
 ```
 
-- **Price snapshot** — `Booking.amount` copied from `CentreTest.price` at create time.  
-- **Active-booking uniqueness** — partial unique index on pending/confirmed slots.  
-- **One SUCCESS payment per booking** — partial unique index.  
+- **Price snapshot** - `Booking.amount` copied from `CentreTest.price` at create time.  
+- **Active-booking uniqueness** - partial unique index on pending/confirmed slots.  
+- **One SUCCESS payment per booking** - partial unique index.  
 - **Idempotency-Key** unique per user; webhook `event_id` unique.
 
 ## Booking state machine
@@ -379,7 +379,7 @@ curl -s -X POST http://localhost:8000/payments/ \
   -H 'Idempotency-Key: pay-reviewer-001' \
   -d '{"booking_id":"<booking-uuid>","simulate_outcome":"SUCCESS"}'
 
-# Webhook helper (after PENDING payment — amount must match the payment row)
+# Webhook helper (after PENDING payment - amount must match the payment row)
 python scripts/simulate_webhook.py \
   --provider-reference <provider_reference> \
   --amount <amount_from_payment> \
@@ -390,11 +390,11 @@ Webhook HMAC is Stripe-style: `sha256=HMAC(WEBHOOK_SECRET, "{timestamp}.{raw_bod
 
 ## Idempotency & consistency
 
-1. **`Idempotency-Key`** — same user + key returns the original payment; different booking → `422`.  
-2. **`WebhookEvent.event_id`** — duplicates return `{"status":"duplicate"}`; a duplicate while still `RECEIVED` re-queues the worker.  
-3. **`select_for_update`** — booking/payment/event locked in a fixed order.  
-4. **Partial unique indexes** — no double active booking; no second SUCCESS payment.  
-5. **Order-safe apply** — late failure after success ignored; success after cancel keeps booking cancelled and logs refund. Late success after the booking left PENDING settles the payment only (or flags `duplicate_gateway_success_refund_required` if a SUCCESS already exists) and never corrupts booking state.
+1. **`Idempotency-Key`** - same user + key returns the original payment; different booking → `422`.  
+2. **`WebhookEvent.event_id`** - duplicates return `{"status":"duplicate"}`; a duplicate while still `RECEIVED` re-queues the worker.  
+3. **`select_for_update`** - booking/payment/event locked in a fixed order.  
+4. **Partial unique indexes** - no double active booking; no second SUCCESS payment.  
+5. **Order-safe apply** - late failure after success ignored; success after cancel keeps booking cancelled and logs refund. Late success after the booking left PENDING settles the payment only (or flags `duplicate_gateway_success_refund_required` if a SUCCESS already exists) and never corrupts booking state.
 
 ## Edge cases handled
 
